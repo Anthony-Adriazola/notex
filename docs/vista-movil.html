@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notex · vista en el celular</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #0d0d0d;
+        color: #e9e6df;
+        font-family: "Source Sans 3", system-ui, sans-serif;
+      }
+      header {
+        padding: 34px 36px 10px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-family: Georgia, "Source Serif 4", serif;
+        font-size: 34px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      header p {
+        margin: 0;
+        color: #a29d94;
+        font-size: 15px;
+        max-width: 760px;
+        line-height: 1.55;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 18px 36px;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: rgba(13, 13, 13, 0.96);
+        border-bottom: 1px solid #262626;
+      }
+      button {
+        background: #1b1b1b;
+        color: #a29d94;
+        border: 1px solid #373737;
+        padding: 8px 13px;
+        border-radius: 8px;
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:hover { border-color: #5a5a5a; color: #e9e6df; }
+      button.active {
+        background: #e9e6df;
+        border-color: #e9e6df;
+        color: #141414;
+        font-weight: 600;
+      }
+      .stage {
+        display: flex;
+        gap: 38px;
+        align-items: flex-start;
+        padding: 30px 36px 60px;
+      }
+      .phone {
+        width: 392px;
+        height: 844px;
+        flex: 0 0 auto;
+        overflow-y: auto;
+        background: #141414;
+        border: 10px solid #2b2b2b;
+        border-radius: 46px;
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+      }
+      .phone img { display: block; width: 100%; }
+      .side { max-width: 380px; }
+      .side h2 {
+        margin: 0 0 8px;
+        font-family: Georgia, "Source Serif 4", serif;
+        font-size: 24px;
+        font-weight: 600;
+      }
+      .side p { margin: 0; color: #a29d94; font-size: 15px; line-height: 1.6; }
+      .icon {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin-top: 28px;
+        padding-top: 22px;
+        border-top: 1px solid #262626;
+      }
+      .icon img { width: 64px; height: 64px; border-radius: 16px; }
+      .icon strong { display: block; color: #e9e6df; font-size: 14px; }
+      .icon span { color: #7b766d; font-size: 13px; }
+      .note {
+        margin-top: 22px;
+        font-size: 12px;
+        color: #7b766d;
+        line-height: 1.5;
+      }
+      .note code { color: #a29d94; font-family: "JetBrains Mono", monospace; }
+      @media (max-width: 900px) {
+        .stage { flex-direction: column; }
+        .phone { width: 100%; max-width: 392px; height: 70vh; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Notex en el celular</h1>
+      <p>
+        Renderizado a <strong>360 px de ancho</strong>: el mismo ancho lógico del
+        Honor X6c (720 px físicos, densidad 2). Los montos y nombres son datos de
+        ejemplo, no los gastos reales.
+      </p>
+    </header>
+
+    <div class="tabs" id="tabs" aria-label="Pantallas"></div>
+
+    <div class="stage">
+      <div class="phone" id="phone">
+        <img id="shot" src="capturas/dashboard-360.png" alt="Pantalla de Notex" />
+      </div>
+      <div class="side">
+        <h2 id="title">Resumen</h2>
+        <p id="desc">
+          Totales del día, la semana, el mes y el año, presupuesto y últimos
+          movimientos.
+        </p>
+        <div class="icon">
+          <img src="capturas/icono.png" alt="Icono de Notex" />
+          <div>
+            <strong>Icono</strong>
+            <span>La N sobre carbón, adaptativo.</span>
+          </div>
+        </div>
+        <p class="note">
+          La captura es de página completa: scrolleá dentro del teléfono para
+          ver el resto. En el Honor, el teléfono mide 360 × 802 px lógicos.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      const screens = [
+        ["dashboard-360.png", "Resumen", "Totales del día, la semana, el mes y el año, presupuesto y últimos movimientos."],
+        ["add-360.png", "Agregar", "Monto con teclado, categoría, cuenta, fecha y nota. Dos toques para guardar."],
+        ["movements-360.png", "Movimientos", "Lista por día con búsqueda y filtros por gasto, ingreso o transferencia."],
+        ["pending-360.png", "Pendientes", "Pagos recurrentes que vencen: registrar, corregir el monto o saltar el mes."],
+        ["budgets-360.png", "Presupuestos", "Presupuesto por categoría con barra de uso y alerta al 80% y 100%."],
+        ["reports-360.png", "Reportes", "Últimos 12 meses, gastos por categoría y saldo por cuenta."],
+        ["settings-360.png", "Ajustes", "Cuentas, categorías, recurrentes, respaldo y sincronización."],
+      ];
+
+      const tabs = document.getElementById("tabs");
+      const shot = document.getElementById("shot");
+      const title = document.getElementById("title");
+      const desc = document.getElementById("desc");
+      const phone = document.getElementById("phone");
+
+      screens.forEach(([file, name, text], index) => {
+        const button = document.createElement("button");
+        button.textContent = name;
+        button.className = index === 0 ? "active" : "";
+        button.onclick = () => {
+          shot.src = "capturas/" + file;
+          title.textContent = name;
+          desc.textContent = text;
+          [...tabs.children].forEach((child) => child.classList.remove("active"));
+          button.classList.add("active");
+          phone.scrollTop = 0;
+        };
+        tabs.appendChild(button);
+      });
+    </script>
+  </body>
+</html>

@@ -12,6 +12,13 @@ sincroniza la laptop con el celular sin cuentas en la nube.
 - **Datos:** SQLite local en cada equipo. La laptop hace de servidor de
   sincronización y el celular se conecta por una red privada de Tailscale.
 
+## Vista previa
+
+<img src="docs/capturas/dashboard-360.png" width="320" alt="Resumen en el celular">
+
+Más pantallas en [`docs/vista-movil.md`](docs/vista-movil.md). Los datos de las
+capturas son de ejemplo.
+
 ## Stack
 
 - **Rust:** SQLite (`rusqlite`), modelo de datos, cálculos, servidor de sync
