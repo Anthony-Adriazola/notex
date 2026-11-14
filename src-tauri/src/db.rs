@@ -1731,9 +1731,6 @@ pub fn update_concept(
     if name.is_empty() {
         return Err("El concepto necesita un nombre.".into());
     }
-    if input.monthly && !(1..=31).contains(&input.due_day.unwrap_or(0)) {
-        return Err("Elegí un día de vencimiento entre 1 y 31.".into());
-    }
     conn.execute(
         "UPDATE categories SET
              name = ?1, kind = ?2, color = ?3, icon = ?4, budget_cents = ?5,
@@ -1777,7 +1774,7 @@ pub fn monthly_concepts(
     let mut out = Vec::new();
     for concept in list_categories(conn, None)?
         .into_iter()
-        .filter(|concept| concept.monthly && !concept.archived)
+        .filter(|concept| concept.monthly && !concept.archived && concept.kind == "expense")
     {
         let Some(due) = concept_due_date(month, concept.due_day.unwrap_or(1)) else {
             continue;
@@ -2003,56 +2000,6 @@ pub fn method_totals(
 
 pub fn reminders(conn: &Connection, today: NaiveDate) -> rusqlite::Result<Vec<ReminderItem>> {
     let mut out = Vec::new();
-    let current_month = month_key(today);
-    for concept in list_categories(conn, None)?
-        .into_iter()
-        .filter(|concept| concept.monthly && !concept.archived)
-    {
-        let due_day = concept.due_day.unwrap_or(1);
-        let this_month = concept_due_date(&current_month, due_day).unwrap_or(today);
-        let (from, to) = month_bounds(today.year(), today.month());
-        let paid: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM transactions WHERE category_id = ?1
-             AND kind IN ('expense','income') AND deleted_at IS NULL AND date >= ?2 AND date <= ?3",
-            params![concept.id, from.to_string(), to.to_string()],
-            |row| row.get(0),
-        )?;
-        let skipped: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM concept_skips WHERE concept_id = ?1 AND month = ?2",
-            params![concept.id, current_month],
-            |row| row.get(0),
-        )?;
-        let settled = paid > 0 || skipped > 0;
-        let due = if settled || this_month < today {
-            if settled {
-                let (year, month_number) = if today.month() == 12 {
-                    (today.year() + 1, 1)
-                } else {
-                    (today.year(), today.month() + 1)
-                };
-                let next_month = format!("{year:04}-{month_number:02}");
-                concept_due_date(&next_month, due_day).unwrap_or(today)
-            } else {
-                this_month
-            }
-        } else {
-            this_month
-        };
-        let days_left = (due - today).num_days();
-        if days_left <= concept.reminder_days {
-            out.push(ReminderItem {
-                kind: "concept".into(),
-                concept_id: concept.id,
-                name: concept.name,
-                due_date: due.to_string(),
-                days_left,
-                amount_cents: concept.last_amount_cents,
-                method: concept.last_method,
-                reminder_days: concept.reminder_days,
-            });
-        }
-    }
-
     let mut stmt = conn.prepare(
         "SELECT p.id, p.concept_id, p.amount_cents, p.due_date, p.note, p.reminder_days,
                 p.method, c.name

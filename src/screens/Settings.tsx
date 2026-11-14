@@ -38,6 +38,7 @@ import type {
 import {
   Button,
   ConfirmBar,
+  Dialog,
   Field,
   IconButton,
   Micro,
@@ -218,8 +219,6 @@ function CategoryForm({
       : "",
   );
   const [monthly, setMonthly] = useState(editing?.monthly ?? false);
-  const [dueDay, setDueDay] = useState(String(editing?.dueDay ?? 5));
-  const [reminder, setReminder] = useState(String(editing?.reminderDays ?? 3));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -237,9 +236,9 @@ function CategoryForm({
         color,
         icon,
         budgetCents: parseAmountToCents(budget) || null,
-        monthly,
-        dueDay: monthly ? Number(dueDay) || 1 : null,
-        reminderDays: Number(reminder) || 3,
+        monthly: kind === "expense" ? monthly : false,
+        dueDay: null,
+        reminderDays: 3,
       };
       if (editing) {
         await api.updateConcept(editing.id, input);
@@ -298,37 +297,17 @@ function CategoryForm({
             ))}
           </div>
         </Field>
-        <Field label="¿Se paga cada mes?">
-          <Segmented
-            value={monthly ? "yes" : "no"}
-            onChange={(value) => setMonthly(value === "yes")}
-            options={[
-              { value: "no", label: "No" },
-              { value: "yes", label: "Sí" },
-            ]}
-          />
-        </Field>
-        {monthly ? (
-          <>
-            <Field label="Día de vencimiento">
-              <TextInput
-                type="number"
-                min={1}
-                max={31}
-                value={dueDay}
-                onChange={(event) => setDueDay(event.target.value)}
-              />
-            </Field>
-            <Field label="Avisar días antes">
-              <TextInput
-                type="number"
-                min={0}
-                max={30}
-                value={reminder}
-                onChange={(event) => setReminder(event.target.value)}
-              />
-            </Field>
-          </>
+        {kind === "expense" ? (
+          <Field label="¿Se paga cada mes?">
+            <Segmented
+              value={monthly ? "yes" : "no"}
+              onChange={(value) => setMonthly(value === "yes")}
+              options={[
+                { value: "no", label: "No" },
+                { value: "yes", label: "Sí" },
+              ]}
+            />
+          </Field>
         ) : null}
         <Field label="Presupuesto mensual (opcional)">
           <TextInput
@@ -989,7 +968,7 @@ export function SettingsScreen() {
 
 <Section
           title="Conceptos"
-          description="Lo que pagás. Si se paga cada mes, elegí el día y los días de aviso. El presupuesto es opcional."
+          description="Lo que pagás. Marcá los que se pagan cada mes para que aparezcan en Pendientes."
           action={
             <Button
               size="sm"
@@ -1041,9 +1020,7 @@ export function SettingsScreen() {
                         {category.name}
                       </p>
                       <p className="mt-0.5 text-xs text-dim">
-                        {category.monthly
-                          ? `Cada mes · día ${category.dueDay ?? 1}`
-                          : "Cuando lo uses"}
+                        {category.monthly ? "Cada mes" : "Cuando lo uses"}
                         {category.budgetCents
                           ? ` · ${fmtMoney(category.budgetCents)}`
                           : ""}
@@ -1100,7 +1077,15 @@ export function SettingsScreen() {
                 </div>
               ))}
           </div>
-          {showCategoryForm ? (
+          <Dialog
+            open={showCategoryForm}
+            title={editingCategory ? "Editar concepto" : "Nuevo concepto"}
+            subtitle="Ponle nombre y elegí si se paga cada mes."
+            onClose={() => {
+              setShowCategoryForm(false);
+              setEditingCategory(null);
+            }}
+          >
             <CategoryForm
               key={editingCategory?.id ?? "new"}
               kind={categoryKind}
@@ -1110,7 +1095,7 @@ export function SettingsScreen() {
                 setEditingCategory(null);
               }}
             />
-          ) : null}
+          </Dialog>
         </Section>
 
         {false ? (

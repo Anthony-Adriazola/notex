@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Check, ChevronRight, X } from "lucide-react";
+import { CalendarClock, Check, ChevronRight, Repeat, X } from "lucide-react";
 
 import { CategoryIcon } from "../lib/icons";
 import { api } from "../lib/api";
 import {
-  fmtDay,
   monthKey,
   monthLabelFromKey,
   monthShort,
@@ -87,13 +86,8 @@ function ConceptRow({
   return (
     <div className="px-4 py-4 sm:px-5">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg border border-line bg-sunken">
-          <span className="num text-sm leading-none text-ink">
-            {item.dueDate.slice(8, 10)}
-          </span>
-          <span className="mt-0.5 font-mono text-[0.5625rem] uppercase text-dim">
-            {monthShort(item.dueDate)}
-          </span>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-sunken">
+          <Repeat className="h-4 w-4 text-muted" strokeWidth={1.75} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -103,9 +97,11 @@ function ConceptRow({
                 <span style={{ color: item.color }}>
                   <CategoryIcon name={item.icon} className="h-3 w-3" />
                 </span>
-                {item.status === "paid" && item.paidAmountCents !== null
-                  ? `Pagado ${fmtDay(item.dueDate)}`
-                  : `${item.reminderDays} días de aviso`}
+                {item.status === "paid"
+                  ? "Pagado este mes"
+                  : item.kind === "income"
+                    ? "Ingreso mensual"
+                    : "Pago mensual"}
               </p>
             </div>
             <StatusChip status={item.status} />
@@ -153,9 +149,7 @@ function ConceptRow({
       ) : (
         <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
           <span className="text-xs text-dim">
-            {item.status === "paid"
-              ? `Pagado ${fmtDay(item.dueDate)}`
-              : "Saltado este mes"}
+            {item.status === "paid" ? "Pagado este mes" : "Saltado este mes"}
           </span>
           <Money
             cents={item.paidAmountCents ?? item.lastAmountCents ?? 0}
@@ -202,10 +196,7 @@ function PlannedRow({
             {item.note || "Pago puntual"} ·{" "}
             {item.method === "qr" ? "QR" : "Efectivo"}
           </p>
-          <p className="mt-0.5 text-[11px] text-dim">
-            Aviso {item.reminderDays} día{item.reminderDays === 1 ? "" : "s"}{" "}
-            antes
-          </p>
+          <p className="mt-0.5 text-[11px] text-dim">Aviso 1 día antes</p>
         </div>
         <Money
           cents={item.amountCents}
@@ -251,12 +242,14 @@ export function PendingScreen({
   const [newAmount, setNewAmount] = useState("");
   const [newDate, setNewDate] = useState(todayISO());
   const [newNote, setNewNote] = useState("");
-  const [newReminder, setNewReminder] = useState("1");
   const [newMethod, setNewMethod] = useState<"cash" | "qr">("cash");
   const [creating, setCreating] = useState(false);
 
   const activeCategories = useMemo(
-    () => categories.filter((category) => !category.archived),
+    () =>
+      categories.filter(
+        (category) => !category.archived && category.kind === "expense",
+      ),
     [categories],
   );
 
@@ -394,7 +387,7 @@ export function PendingScreen({
         amountCents: parseAmountToCents(newAmount) || null,
         dueDate: newDate,
         note: newNote.trim() || null,
-        reminderDays: Number(newReminder) || 1,
+        reminderDays: 1,
         method: newMethod,
       });
       await refresh();
@@ -431,7 +424,7 @@ export function PendingScreen({
     <div className="notex-screen">
       <PageHeader
         title="Pendientes"
-        subtitle="Pagos mensuales y pendientes puntuales, con sus recordatorios."
+        subtitle="Pagos mensuales y pendientes puntuales."
         actions={<MonthNav month={month} onChange={setMonth} />}
       />
 
@@ -504,16 +497,6 @@ export function PendingScreen({
                   type="date"
                   value={newDate}
                   onChange={(event) => setNewDate(event.target.value)}
-                />
-              </label>
-              <label className="block">
-                <Micro className="mb-1.5 block">Avisar días antes</Micro>
-                <TextInput
-                  type="number"
-                  min={0}
-                  max={30}
-                  value={newReminder}
-                  onChange={(event) => setNewReminder(event.target.value)}
                 />
               </label>
               <label className="block sm:col-span-2">

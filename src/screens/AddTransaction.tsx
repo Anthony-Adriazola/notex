@@ -8,6 +8,7 @@ import { useStore } from "../lib/store";
 import type { CategoryInput, TransactionRow, TxKind } from "../lib/types";
 import {
   Button,
+  Dialog,
   Field,
   Micro,
   PageHeader,
@@ -58,8 +59,6 @@ export function AddTransactionScreen({
   const [showNewConcept, setShowNewConcept] = useState(false);
   const [newName, setNewName] = useState("");
   const [newMonthly, setNewMonthly] = useState(false);
-  const [newDueDay, setNewDueDay] = useState("5");
-  const [newReminder, setNewReminder] = useState("3");
   const [creating, setCreating] = useState(false);
 
   const categoryKind: "expense" | "income" =
@@ -101,11 +100,11 @@ export function AddTransactionScreen({
       const input: CategoryInput = {
         name: newName.trim(),
         kind: categoryKind,
-        color: "#d9a441",
+        color: categoryKind === "income" ? "#8fb996" : "#d9a441",
         icon: "circle-ellipsis",
-        monthly: newMonthly,
-        dueDay: newMonthly ? Number(newDueDay) || 1 : null,
-        reminderDays: Number(newReminder) || 3,
+        monthly: categoryKind === "expense" ? newMonthly : false,
+        dueDay: null,
+        reminderDays: 3,
       };
       const created = await api.createCategory(input);
       await refresh();
@@ -172,7 +171,11 @@ export function AddTransactionScreen({
     <div className="notex-screen">
       <PageHeader
         title={editing ? "Editar movimiento" : "Nuevo movimiento"}
-        subtitle="Escribe el monto, elige qué estás pagando y con qué medio."
+        subtitle={
+          categoryKind === "income"
+            ? "Escribe el monto y elegí de dónde viene el ingreso."
+            : "Escribe el monto, elegí qué estás pagando y con qué medio."
+        }
         actions={
           <Button variant="ghost" onClick={onCancel}>
             <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
@@ -224,7 +227,11 @@ export function AddTransactionScreen({
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <Micro>¿Qué estás pagando?</Micro>
+            <Micro>
+              {categoryKind === "income"
+                ? "¿Qué estás cobrando?"
+                : "¿Qué estás pagando?"}
+            </Micro>
             <span className="text-xs text-dim">
               {visibleCategories.length} conceptos
             </span>
@@ -270,17 +277,41 @@ export function AddTransactionScreen({
           </div>
         </div>
 
-        {showNewConcept ? (
-          <Panel className="border-line-strong p-4">
-            <Micro>Nuevo concepto</Micro>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Field label="Nombre">
-                <TextInput
-                  value={newName}
-                  onChange={(event) => setNewName(event.target.value)}
-                  placeholder="Ej. Análisis de ley"
-                />
-              </Field>
+        <Dialog
+          open={showNewConcept}
+          title={
+            categoryKind === "income"
+              ? "Nuevo concepto de ingreso"
+              : "Nuevo concepto de gasto"
+          }
+          subtitle="Ponle un nombre. Después lo podés editar en Ajustes."
+          onClose={() => setShowNewConcept(false)}
+        >
+          <form
+            className="grid gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createConcept();
+            }}
+          >
+            <Field label="Nombre">
+              <TextInput
+                autoFocus
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                placeholder={
+                  categoryKind === "income"
+                    ? "Ej. Venta de mineral"
+                    : "Ej. Análisis de ley"
+                }
+              />
+            </Field>
+            {error ? (
+              <p role="alert" className="text-sm text-negative">
+                {error}
+              </p>
+            ) : null}
+            {categoryKind === "expense" ? (
               <Field label="¿Se paga cada mes?">
                 <Segmented
                   value={newMonthly ? "yes" : "no"}
@@ -291,39 +322,18 @@ export function AddTransactionScreen({
                   ]}
                 />
               </Field>
-              {newMonthly ? (
-                <>
-                  <Field label="Día de vencimiento">
-                    <TextInput
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={newDueDay}
-                      onChange={(event) => setNewDueDay(event.target.value)}
-                    />
-                  </Field>
-                  <Field label="Avisar días antes">
-                    <TextInput
-                      type="number"
-                      min={0}
-                      max={30}
-                      value={newReminder}
-                      onChange={(event) => setNewReminder(event.target.value)}
-                    />
-                  </Field>
-                </>
-              ) : null}
-            </div>
-            <div className="mt-4 flex gap-2">
+            ) : null}
+            <div className="mt-2 flex gap-2">
               <Button
+                type="submit"
                 variant="primary"
                 size="sm"
-                onClick={() => void createConcept()}
                 disabled={creating || !newName.trim()}
               >
                 {creating ? "Creando…" : "Crear concepto"}
               </Button>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowNewConcept(false)}
@@ -331,8 +341,8 @@ export function AddTransactionScreen({
                 Cancelar
               </Button>
             </div>
-          </Panel>
-        ) : null}
+          </form>
+        </Dialog>
 
         <Panel className="p-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -357,7 +367,11 @@ export function AddTransactionScreen({
               <TextInput
                 value={note}
                 maxLength={140}
-                placeholder="Ej. factura, proveedor, análisis"
+                placeholder={
+                  categoryKind === "income"
+                    ? "Ej. cliente, venta, cobranza"
+                    : "Ej. factura, proveedor, análisis"
+                }
                 onChange={(event) => setNote(event.target.value)}
               />
             </Field>
