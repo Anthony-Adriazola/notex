@@ -3,13 +3,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration as StdDuration;
 
 use axum::extract::{Query, State};
-use axum::http::{header, HeaderMap, Method, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use tower_http::cors::{Any, CorsLayer};
 
 use crate::db;
 use crate::sync_store::{self, SyncChange, SyncStatus};
@@ -523,16 +522,11 @@ pub fn start_server(conn: Arc<Mutex<Connection>>, device_id: String) {
             let state = ServerState {
                 conn: conn.clone(),
             };
-            let cors = CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods([Method::GET, Method::POST])
-                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
             let app = Router::new()
                 .route("/health", get(health))
                 .route("/pair", post(pair_handler))
                 .route("/sync/pull", get(pull_handler))
                 .route("/sync/push", post(push_handler))
-                .layer(cors)
                 .with_state(state);
 
             let mut port = PORT;

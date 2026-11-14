@@ -366,6 +366,12 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<HashMap<String, String
     let mut out = HashMap::new();
     for row in rows {
         let (key, value) = row.map_err(|e| e.to_string())?;
+        if matches!(
+            key.as_str(),
+            "sync_token" | "pair_code" | "pair_expires" | "device_id"
+        ) {
+            continue;
+        }
         out.insert(key, value);
     }
     Ok(out)

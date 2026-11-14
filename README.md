@@ -69,12 +69,23 @@ Generar un APK de depuración para un teléfono ARM64:
 npm run tauri android build -- --debug --apk --target aarch64
 ```
 
-El APK queda en
-`src-tauri/gen/android/app/build/outputs/apk/aarch64/debug/`. Se instala en el
-celular con `adb install` o copiándolo y abriéndolo.
+El APK de depuración queda en
+`src-tauri/gen/android/app/build/outputs/apk/universal/debug/` y se instala en
+el celular con `adb install` o copiándolo y abriéndolo.
 
-Para una versión de release hay que crear un keystore y configurar la firma en
-`src-tauri/gen/android`; el keystore no se commitea.
+Para una versión release firmada:
+
+```bash
+npm run tauri android build -- --apk --target aarch64
+```
+
+El APK queda en
+`src-tauri/gen/android/app/build/outputs/apk/universal/release/`. La firma usa
+el keystore de `~/.local/share/notex/notex-release.jks`; las credenciales están
+en `~/.local/share/notex/keystore.txt` y **no** se commitean. Guardar esos dos
+archivos: sin ellos no se pueden publicar actualizaciones firmadas.
+
+En este equipo ya hay un APK release en `/home/anthony/Notex-0.1.0.apk`.
 
 ## Sincronización
 
@@ -178,10 +189,14 @@ Funciona:
 - Sincronización laptop ↔ celular con emparejamiento por código.
 - Backups y exportación CSV.
 
+- APK release firmado con keystore propio.
+- Navegación con el botón Atrás de Android.
+- Bandeja del sistema en escritorio (la app sigue disponible al cerrar la
+  ventana).
+
 Pendiente para la próxima etapa:
 
-- Firma del APK de release y keystore propio.
-- Firma/instalador de Windows en CI.
-- Inicio automático con Windows (la app ya queda en la bandeja).
+- Instalador de Windows en CI (el workflow está en `docs/build-workflow.yml`).
+- Inicio automático con Windows.
 - PIN de bloqueo y fotos de tickets.
 - Prueba en un teléfono Android real y ajuste de insets/teclado.

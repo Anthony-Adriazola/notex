@@ -17,6 +17,23 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 37
     namespace = "com.anthony.notex"
+
+    val keystoreProperties = Properties().apply {
+        val keystoreFile = rootProject.file("keystore.properties")
+        if (keystoreFile.exists()) {
+            keystoreFile.inputStream().use { load(it) }
+        }
+    }
+    signingConfigs {
+        if (keystoreProperties.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.anthony.notex"
@@ -39,6 +56,9 @@ android {
             }
         }
         getByName("release") {
+            if (keystoreProperties.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                enable = true
             }
