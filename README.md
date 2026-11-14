@@ -148,6 +148,25 @@ PRODUCT.md            Contexto de producto
 DESIGN.md             Sistema visual
 ```
 
+## CI
+
+El workflow que genera el instalador de Windows y el APK de Android vive en
+`docs/build-workflow.yml`. Para activarlo, copiarlo a
+`.github/workflows/build.yml` y subirlo con un token que tenga el scope
+`workflow`:
+
+```bash
+gh auth login --scopes workflow
+mkdir -p .github/workflows
+cp docs/build-workflow.yml .github/workflows/build.yml
+git add .github/workflows/build.yml
+git commit -m "ci: builds de Windows y Android"
+git push
+```
+
+El APK de depuración para ARM64 también se puede generar localmente; el
+instalador de Windows conviene generarlo en CI o en una máquina Windows.
+
 ## Estado
 
 Funciona:

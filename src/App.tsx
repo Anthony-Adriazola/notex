@@ -13,10 +13,25 @@ import { PendingScreen } from "./screens/Pending";
 import { ReportsScreen } from "./screens/Reports";
 import { SettingsScreen } from "./screens/Settings";
 
+const ROUTES: Route[] = [
+  "dashboard",
+  "movements",
+  "add",
+  "pending",
+  "budgets",
+  "reports",
+  "settings",
+];
+
+function routeFromLocation(): Route {
+  const value = window.location.hash.replace(/^#\/?/, "");
+  return ROUTES.includes(value as Route) ? (value as Route) : "dashboard";
+}
+
 function Workspace() {
   const { settings, error, refresh, refreshSync } = useStore();
   const { show } = useToast();
-  const [route, setRoute] = useState<Route>("dashboard");
+  const [route, setRoute] = useState<Route>(routeFromLocation);
   const [editing, setEditing] = useState<TransactionRow | null>(null);
   const [returnRoute, setReturnRoute] = useState<Route>("dashboard");
 
@@ -25,25 +40,43 @@ function Workspace() {
       settings.large_text === "1" ? "large" : "normal";
   }, [settings.large_text]);
 
-  const navigate = (next: Route) => {
-    if (next === "add") {
-      setReturnRoute(route === "add" ? "dashboard" : route);
+  useEffect(() => {
+    const onPop = () => {
       setEditing(null);
+      setRoute(routeFromLocation());
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const go = (next: Route, push = true) => {
+    if (push && next !== route) {
+      window.history.pushState({ route: next }, "", `#${next}`);
+    } else {
+      window.history.replaceState({ route: next }, "", `#${next}`);
     }
     setRoute(next);
     window.scrollTo({ top: 0 });
   };
 
+  const navigate = (next: Route) => {
+    if (next === "add") {
+      setReturnRoute(route === "add" ? "dashboard" : route);
+      setEditing(null);
+    }
+    go(next);
+  };
+
   const edit = (row: TransactionRow) => {
     setReturnRoute("movements");
     setEditing(row);
-    setRoute("add");
-    window.scrollTo({ top: 0 });
+    go("add");
   };
 
   const saved = async () => {
     setEditing(null);
-    setRoute("movements");
+    go("movements", false);
     await refresh();
     void refreshSync();
     show("Movimiento guardado");
@@ -55,7 +88,7 @@ function Workspace() {
       await refresh();
       void refreshSync();
       setEditing(null);
-      setRoute("movements");
+      go("movements", false);
       show("Movimiento eliminado", {
         label: "Deshacer",
         onClick: async () => {
@@ -89,8 +122,9 @@ function Workspace() {
             editing={editing}
             onSaved={() => void saved()}
             onCancel={() => {
+              const back = editing ? "movements" : returnRoute;
               setEditing(null);
-              setRoute(editing ? "movements" : returnRoute);
+              go(back, false);
             }}
             onDelete={(row) => void remove(row)}
             onOpenSettings={() => navigate("settings")}
