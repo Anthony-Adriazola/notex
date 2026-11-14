@@ -334,17 +334,20 @@ export function DashboardScreen({
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-4 text-xs lg:hidden">
+            <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-4 text-xs lg:hidden">
               {data.accounts
                 .filter((account) => !account.archived)
-                .map((account) => (
-                  <span key={account.id} className="text-muted">
-                    {account.name}{" "}
-                    <Money
-                      cents={account.balanceCents}
-                      symbol={false}
-                      className="text-ink"
-                    />
+                .map((account, index) => (
+                  <span key={account.id} className="flex items-center gap-3">
+                    {index > 0 ? <span className="text-line-strong">·</span> : null}
+                    <span className="text-muted">
+                      {account.name}{" "}
+                      <Money
+                        cents={account.balanceCents}
+                        symbol={false}
+                        className="text-ink"
+                      />
+                    </span>
                   </span>
                 ))}
             </div>

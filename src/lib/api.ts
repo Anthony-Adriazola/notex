@@ -17,6 +17,7 @@ import type {
   TransactionFilter,
   TransactionInput,
   TransactionRow,
+  SyncStatus,
 } from "./types";
 
 export const api = {
@@ -96,4 +97,15 @@ export const api = {
     invoke<{ path: string; exportedAt: string }>("backup_now"),
 
   appInfo: () => invoke<AppInfo>("app_info"),
+
+  syncStatus: () => invoke<SyncStatus>("sync_status"),
+
+  syncNewCode: () => invoke<SyncStatus>("sync_new_code"),
+
+  syncPair: (url: string, code: string) =>
+    invoke<SyncStatus>("sync_pair", { url, code }),
+
+  syncNow: () => invoke<SyncStatus>("sync_now"),
+
+  syncUnpair: () => invoke<SyncStatus>("sync_unpair"),
 };

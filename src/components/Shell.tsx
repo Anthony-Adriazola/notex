@@ -3,13 +3,13 @@ import {
   ArrowLeftRight,
   CalendarClock,
   ChartColumn,
-  CloudOff,
   LayoutDashboard,
   Plus,
   Settings,
   Target,
 } from "lucide-react";
 
+import { fmtRelative } from "../lib/format";
 import { useStore } from "../lib/store";
 import type { Route } from "../lib/types";
 import { Money, cx } from "./ui";
@@ -45,30 +45,86 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function SyncStatus({ compact = false }: { compact?: boolean }) {
+function SyncStatus({
+  compact = false,
+  onNavigate,
+}: {
+  compact?: boolean;
+  onNavigate: (route: Route) => void;
+}) {
+  const { sync } = useStore();
+  const client = sync?.role === "client";
+  const connected = client
+    ? Boolean(sync?.configured) && !sync?.lastError
+    : Boolean(sync?.serverRunning);
+  const hasError = client && Boolean(sync?.lastError);
+  const hasPending = client && (sync?.pending ?? 0) > 0;
+  const label = client
+    ? !sync?.configured
+      ? "Sin conectar"
+      : hasError
+        ? "Sin conexión"
+        : hasPending
+          ? "Cambios pendientes"
+          : "Sincronizado"
+    : connected
+      ? "Servidor activo"
+      : "Servidor apagado";
+  const shortLabel = client
+    ? !sync?.configured
+      ? "Sin conectar"
+      : hasError
+        ? "Sin conexión"
+        : hasPending
+          ? "Pendiente"
+          : "Al día"
+    : connected
+      ? "Activo"
+      : "Apagado";
+  const detail = client
+    ? sync?.pending
+      ? `${sync.pending} ${sync.pending === 1 ? "cambio" : "cambios"} por enviar`
+      : sync?.lastSync
+        ? `Última ${fmtRelative(sync.lastSync)}`
+        : "Ajustes → Sincronización"
+    : connected
+      ? "Esperando al celular"
+      : "Revisa Ajustes";
+  const dot = hasError
+    ? "bg-negative"
+    : connected
+      ? hasPending
+        ? "bg-warning"
+        : "bg-positive"
+      : "bg-warning";
+
   if (compact) {
     return (
-      <span
-        className="flex h-7 w-7 items-center justify-center rounded-full border border-line text-dim"
-        title="Solo en este equipo"
-        aria-label="Solo en este equipo"
+      <button
+        onClick={() => onNavigate("settings")}
+        className="flex h-7 items-center gap-2 rounded-full border border-line px-2.5 text-[0.625rem] text-muted"
+        title={`${label} · ${detail}`}
+        aria-label={`${label}. ${detail}`}
       >
-        <CloudOff className="h-3.5 w-3.5" strokeWidth={1.75} />
-      </span>
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        <span className="font-mono uppercase tracking-[0.08em]">{shortLabel}</span>
+      </button>
     );
   }
+
   return (
-    <div className="rounded-lg border border-line bg-sunken px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-dim" />
+    <button
+      onClick={() => onNavigate("settings")}
+      className="w-full rounded-lg border border-line bg-sunken px-3 py-2.5 text-left transition-colors hover:border-line-strong"
+    >
+      <span className="flex items-center gap-2">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
         <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-muted">
-          Solo en este equipo
+          {label}
         </span>
-      </div>
-      <p className="mt-1 text-xs leading-snug text-dim">
-        La sincronización se activa en la próxima etapa.
-      </p>
-    </div>
+      </span>
+      <span className="mt-1 block text-xs leading-snug text-dim">{detail}</span>
+    </button>
   );
 }
 
@@ -161,7 +217,7 @@ export function Shell({
         </div>
 
         <div className="mt-auto flex flex-col gap-2 pt-6">
-          <SyncStatus />
+          <SyncStatus onNavigate={onNavigate} />
           <button
             onClick={() => onNavigate("settings")}
             aria-current={route === "settings" ? "page" : undefined}
@@ -180,7 +236,7 @@ export function Shell({
 
       <header className="safe-top sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-canvas px-4 lg:hidden">
         <Brand />
-        <SyncStatus compact />
+        <SyncStatus compact onNavigate={onNavigate} />
       </header>
 
       <main className="pb-28 lg:pb-0 lg:pl-72">

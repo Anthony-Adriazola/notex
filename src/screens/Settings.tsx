@@ -1,17 +1,26 @@
 import { useEffect, useState } from "react";
 import {
   Archive,
-  CloudOff,
+  Copy,
   Database,
   Download,
   Plus,
+  RefreshCw,
+  Unplug,
+  Wifi,
 } from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
-import { CategoryIcon, CATEGORY_ICON_NAMES } from "../lib/icons";
+import {
+  CATEGORY_ICON_LABELS,
+  CATEGORY_ICON_NAMES,
+  CategoryIcon,
+} from "../lib/icons";
 import { api } from "../lib/api";
 import {
   fmtMoney,
+  fmtRelative,
+  fmtTime,
   formatFrequency,
   nextOccurrence,
   parseAmountToCents,
@@ -241,7 +250,7 @@ function CategoryForm({
           <Select value={icon} onChange={(event) => setIcon(event.target.value)}>
             {CATEGORY_ICON_NAMES.map((name) => (
               <option key={name} value={name}>
-                {name}
+                {CATEGORY_ICON_LABELS[name] ?? name}
               </option>
             ))}
           </Select>
@@ -460,6 +469,283 @@ function RecurringForm({
         </Button>
       </div>
     </div>
+  );
+}
+
+function SyncSection() {
+  const { sync, syncBusy, syncNow, refreshSync, refresh } = useStore();
+  const { show } = useToast();
+  const [url, setUrl] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const isHub = (sync?.role ?? "hub") !== "client";
+  const connected = isHub
+    ? Boolean(sync?.serverRunning)
+    : Boolean(sync?.configured) && !sync?.lastError;
+  const statusLabel = isHub
+    ? connected
+      ? "Servidor activo"
+      : "Servidor apagado"
+    : sync?.configured
+      ? sync.lastError
+        ? "Sin conexión"
+        : "Conectado"
+      : "Sin conectar";
+  const statusDot = connected
+    ? sync?.lastError
+      ? "bg-negative"
+      : "bg-positive"
+    : "bg-warning";
+
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      show("Dirección copiada");
+    } catch {
+      show("Copia la dirección manualmente.");
+    }
+  };
+
+  const generate = async () => {
+    setBusy(true);
+    try {
+      await api.syncNewCode();
+      await refreshSync();
+      show("Código generado");
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connect = async () => {
+    if (!url.trim() || code.trim().length < 6) {
+      show("Completa la dirección y el código.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const status = await api.syncPair(url.trim(), code.trim());
+      await refreshSync();
+      await refresh();
+      show(status.lastError ? "Conectado; esperando la primera sincronización" : "Celular conectado");
+      setCode("");
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runNow = async () => {
+    try {
+      const status = await syncNow();
+      show(status?.lastError ?? "Sincronizado");
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
+  const disconnect = async () => {
+    setBusy(true);
+    try {
+      await api.syncUnpair();
+      await refreshSync();
+      show("Celular desconectado");
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!sync) {
+    return (
+      <Section title="Sincronización" description="Cargando el estado de la conexión…">
+        <p className="px-5 py-4 text-sm text-muted">Un momento.</p>
+      </Section>
+    );
+  }
+
+  return (
+    <Section
+      title="Sincronización"
+      description={
+        isHub
+          ? "Esta laptop guarda los datos y el celular se conecta a ella."
+          : "Los datos viajan entre el celular y la laptop."
+      }
+      action={
+        <span className="flex items-center gap-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-dim">
+          <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
+          {statusLabel}
+        </span>
+      }
+    >
+      {isHub ? (
+        <div className="flex flex-col gap-5 px-5 py-4">
+          <div>
+            <Micro>Dirección de la laptop</Micro>
+            <div className="mt-2 flex flex-col gap-2">
+              {sync.serverUrls.length > 0 ? (
+                sync.serverUrls.map((address) => (
+                  <div
+                    key={address}
+                    className="flex items-center gap-2 rounded-lg border border-line bg-sunken px-3 py-2"
+                  >
+                    <code className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-ink">
+                      {address}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void copy(address)}
+                    >
+                      <Copy className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      Copiar
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-warning">
+                  No encontré una dirección de red. Conecta Wi-Fi o Tailscale en
+                  esta laptop.
+                </p>
+              )}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-dim">
+              Si el celular está fuera de casa, usa la dirección que empieza con
+              100 (la de Tailscale).
+            </p>
+          </div>
+
+          <div className="border-t border-line pt-4">
+            <Micro>Código para el celular</Micro>
+            {sync.pairCode ? (
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <span className="font-mono text-[2rem] tracking-[0.22em] text-ink">
+                  {sync.pairCode}
+                </span>
+                <span className="text-xs text-dim">
+                  Vence a las {fmtTime(sync.pairExpires)}
+                </span>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted">
+                Genera un código de 6 dígitos y escríbelo en el celular.
+              </p>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={() => void generate()}
+              disabled={busy}
+            >
+              <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+              {sync.pairCode ? "Generar otro código" : "Generar código"}
+            </Button>
+          </div>
+
+          <p className="rounded-lg border border-line bg-sunken px-3 py-2.5 text-xs leading-relaxed text-muted">
+            En el celular:{" "}
+            <span className="text-ink">Ajustes → Sincronización</span>, pega la
+            dirección y el código. Los dos equipos tienen que estar en la misma
+            red de Tailscale.
+          </p>
+
+          {!sync.serverRunning ? (
+            <p className="text-sm text-warning">
+              El servidor no está activo en esta laptop. Reinicia la app.
+            </p>
+          ) : null}
+        </div>
+      ) : sync.configured ? (
+        <div className="flex flex-col gap-4 px-5 py-4">
+          <div>
+            <Micro>Conectado a</Micro>
+            <code className="mt-1.5 block break-all font-mono text-sm text-ink">
+              {sync.url}
+            </code>
+            <p className="mt-1.5 text-xs text-dim">
+              Última sincronización: {fmtRelative(sync.lastSync)} ·{" "}
+              {sync.pending}{" "}
+              {sync.pending === 1 ? "cambio pendiente" : "cambios pendientes"}
+            </p>
+          </div>
+          {sync.lastError ? (
+            <p className="rounded-lg border border-negative/40 bg-negative/10 px-3 py-2 text-sm text-negative">
+              {sync.lastError}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => void runNow()}
+              disabled={syncBusy}
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${syncBusy ? "animate-spin" : ""}`}
+                strokeWidth={1.75}
+              />
+              {syncBusy ? "Sincronizando…" : "Sincronizar ahora"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void disconnect()}
+              disabled={busy}
+            >
+              <Unplug className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Desconectar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 px-5 py-4">
+          <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+            <Field label="Dirección de la laptop">
+              <TextInput
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="http://100.x.x.x:8787"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </Field>
+            <Field label="Código">
+              <TextInput
+                value={code}
+                onChange={(event) =>
+                  setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                placeholder="000000"
+                inputMode="numeric"
+                maxLength={6}
+                className="font-mono tracking-[0.2em]"
+              />
+            </Field>
+          </div>
+          <Button
+            variant="primary"
+            className="self-start"
+            onClick={() => void connect()}
+            disabled={busy}
+          >
+            <Wifi className="h-4 w-4" strokeWidth={1.75} />
+            {busy ? "Conectando…" : "Conectar con la laptop"}
+          </Button>
+          <p className="text-xs leading-relaxed text-muted">
+            En la laptop: Ajustes → Sincronización → Generar código. Pega acá la
+            dirección y el código.
+          </p>
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -795,24 +1081,7 @@ export function SettingsScreen() {
           ) : null}
         </Section>
 
-        <Section
-          title="Sincronización"
-          description="El celular y la laptop van a compartir los mismos datos por una red privada."
-          action={
-            <span className="flex items-center gap-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-dim">
-              <CloudOff className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Solo en este equipo
-            </span>
-          }
-        >
-          <div className="px-5 py-4">
-            <p className="max-w-2xl text-sm leading-relaxed text-muted">
-              Mientras tanto, todo se guarda en esta laptop y funciona sin
-              internet. Cuando activemos la conexión, vas a poder emparejar el
-              celular con un código y los cambios se van a encontrar solos.
-            </p>
-          </div>
-        </Section>
+        <SyncSection />
 
         <Section
           title="Datos y respaldo"

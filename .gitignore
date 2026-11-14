@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Herramientas de diseño instaladas localmente
+.opencode/
+
+# Salidas de compilación de Android
+src-tauri/gen/android/app/src/main/jniLibs/

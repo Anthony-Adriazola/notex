@@ -38,6 +38,20 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 
 export const CATEGORY_ICON_NAMES = Object.keys(CATEGORY_ICONS);
 
+export const CATEGORY_ICON_LABELS: Record<string, string> = {
+  utensils: "Cubiertos",
+  bus: "Transporte",
+  house: "Casa",
+  zap: "Servicios",
+  "heart-pulse": "Salud",
+  "graduation-cap": "Educación",
+  coffee: "Café",
+  shirt: "Ropa",
+  "circle-ellipsis": "Otros",
+  wallet: "Billetera",
+  "plus-circle": "Ingreso extra",
+};
+
 export function CategoryIcon({
   name,
   className = "h-4 w-4",

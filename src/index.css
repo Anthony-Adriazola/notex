@@ -96,7 +96,7 @@
 @layer components {
   .num {
     font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum" 1;
+    font-feature-settings: "tnum" 1, "zero" 1;
   }
 
   .micro {

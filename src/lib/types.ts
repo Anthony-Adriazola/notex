@@ -216,3 +216,18 @@ export type Route =
   | "budgets"
   | "reports"
   | "settings";
+
+export interface SyncStatus {
+  role: "hub" | "client";
+  configured: boolean;
+  url: string | null;
+  lastSync: string | null;
+  pending: number;
+  lastError: string | null;
+  serverRunning: boolean;
+  serverUrls: string[];
+  pairCode: string | null;
+  pairExpires: string | null;
+  serverSeq: number;
+  deviceId: string;
+}

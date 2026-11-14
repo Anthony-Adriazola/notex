@@ -780,6 +780,7 @@ pub fn set_budget(
         return Err("El mes no es válido.".into());
     }
     let now = now_iso();
+    let id = format!("budget:{}:{}", input.category_id, input.month);
     conn.execute(
         "INSERT INTO budgets
          (id, category_id, month, amount_cents, created_at, updated_at, deleted_at, device_id)
@@ -789,7 +790,7 @@ pub fn set_budget(
              updated_at = excluded.updated_at,
              deleted_at = NULL",
         params![
-            new_id(),
+            id,
             input.category_id,
             input.month,
             input.amount_cents,
@@ -1131,4 +1132,21 @@ pub fn export_csv(conn: &Connection) -> rusqlite::Result<String> {
 pub fn backup_to(conn: &Connection, path: &Path) -> rusqlite::Result<()> {
     let escaped = path.to_string_lossy().replace('\'', "''");
     conn.execute_batch(&format!("VACUUM INTO '{escaped}';"))
+}
+
+pub fn get_category(conn: &Connection, id: &str) -> rusqlite::Result<Category> {
+    conn.query_row(
+        "SELECT id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, deleted_at, device_id
+         FROM categories WHERE id = ?1",
+        [id],
+        row_category,
+    )
+}
+
+pub fn get_recurring(conn: &Connection, id: &str) -> rusqlite::Result<Recurring> {
+    conn.query_row(
+        &format!("{RECURRING_SELECT} AND r.id = ?1"),
+        [id],
+        row_recurring,
+    )
 }

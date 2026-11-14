@@ -159,6 +159,31 @@ function advanceDate(date: Date, frequency: string): Date {
   return next;
 }
 
+export function fmtRelative(iso: string | null): string {
+  if (!iso) return "nunca";
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "nunca";
+  const diff = Date.now() - then;
+  if (diff < 0) return "ahora";
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "hace un momento";
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "ayer" : `hace ${days} días`;
+}
+
+export function fmtTime(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "";
+  return new Intl.DateTimeFormat("es-BO", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function nextOccurrence(
   startISO: string,
   frequency: string,

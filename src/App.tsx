@@ -14,7 +14,7 @@ import { ReportsScreen } from "./screens/Reports";
 import { SettingsScreen } from "./screens/Settings";
 
 function Workspace() {
-  const { settings, error, refresh } = useStore();
+  const { settings, error, refresh, refreshSync } = useStore();
   const { show } = useToast();
   const [route, setRoute] = useState<Route>("dashboard");
   const [editing, setEditing] = useState<TransactionRow | null>(null);
@@ -45,6 +45,7 @@ function Workspace() {
     setEditing(null);
     setRoute("movements");
     await refresh();
+    void refreshSync();
     show("Movimiento guardado");
   };
 
@@ -52,6 +53,7 @@ function Workspace() {
     try {
       await api.deleteTransaction(row.id);
       await refresh();
+      void refreshSync();
       setEditing(null);
       setRoute("movements");
       show("Movimiento eliminado", {
