@@ -31,6 +31,7 @@ const BUTTON_SIZES: Record<ButtonSize, string> = {
 export function Button({
   variant = "outline",
   size = "md",
+  type = "button",
   className,
   children,
   ...props
@@ -40,6 +41,7 @@ export function Button({
 }) {
   return (
     <button
+      type={type}
       className={cx(
         "inline-flex items-center justify-center gap-2 rounded-lg transition-colors duration-150 disabled:cursor-not-allowed",
         BUTTON_VARIANTS[variant],
@@ -55,6 +57,7 @@ export function Button({
 
 export function IconButton({
   label,
+  type = "button",
   className,
   children,
   ...props
@@ -63,6 +66,7 @@ export function IconButton({
 }) {
   return (
     <button
+      type={type}
       aria-label={label}
       title={label}
       className={cx(
@@ -265,6 +269,7 @@ export function Segmented<T extends string>({
         return (
           <button
             key={option.value}
+            type="button"
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(option.value)}

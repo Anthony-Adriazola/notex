@@ -76,6 +76,7 @@ pub fn run() {
             db::seed(&conn)?;
             let device_id = db::device_id(&conn)?;
             let migrated = db::upgrade_business_defaults(&conn)?;
+            db::ensure_account_label(&conn)?;
             if migrated {
                 for category in db::list_categories(&conn, None)? {
                     let payload = serde_json::to_string(&category)?;

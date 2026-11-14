@@ -205,7 +205,7 @@ pub fn seed(conn: &Connection) -> rusqlite::Result<()> {
     }
 
     let accounts = [
-        ("acc-cash", "Caja", "cash"),
+        ("acc-cash", "Efectivo", "cash"),
         ("acc-bank", "Banco", "bank"),
     ];
     for (id, name, kind) in accounts {
@@ -230,6 +230,15 @@ pub fn seed(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+pub fn ensure_account_label(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE accounts SET name = 'Efectivo', updated_at = ?1
+         WHERE id = 'acc-cash' AND name = 'Caja'",
+        params![now_iso()],
+    )?;
+    Ok(())
+}
+
 pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
     if get_setting(conn, "business_defaults_v1")?.is_some() {
         return Ok(false);
@@ -243,11 +252,6 @@ pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
             params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
         )?;
     }
-    conn.execute(
-        "UPDATE accounts SET name = 'Caja', updated_at = ?1
-         WHERE id = 'acc-cash' AND name = 'Efectivo'",
-        params![&now],
-    )?;
     for id in OLD_PERSONAL_CATEGORIES {
         conn.execute(
             "UPDATE categories SET archived = 1, updated_at = ?1
@@ -1358,7 +1362,7 @@ mod tests {
                 row.get(0)
             })
             .unwrap();
-        assert_eq!(cash, "Caja");
+        assert_eq!(cash, "Efectivo");
         let kept: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM transactions WHERE id = ?1",

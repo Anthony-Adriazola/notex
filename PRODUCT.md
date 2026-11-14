@@ -31,7 +31,7 @@ A private, local-first expense tracker for a small trading business. Both device
 - Income is recorded too (sales and collections), so the month's result is meaningful.
 - Typical expenses: purchase of merchandise, suppliers, freight and transport, fuel, shop rent, utilities, payroll and payroll taxes, taxes and fees, marketing, packaging and supplies, maintenance, bank fees, travel, other.
 - Recurring payments: shop rent, electricity, water, internet, payroll taxes. Amounts vary, so a recurring item is shown month by month with a pending/paid/skipped/upcoming status and allows editing the amount before posting.
-- Cash ("Caja") and bank accounts are tracked separately; transfers between them are not expenses.
+- Cash ("Efectivo") and bank accounts are tracked separately; transfers between them are not expenses.
 - Weeks start on Monday. Dates are shown as dd/mm/aaaa. Currency is BOB, formatted as `Bs 1.234,56`.
 - Only one user: no shared budgets, no multiuser roles, no invitations.
 
@@ -42,7 +42,7 @@ Confirmed for the first release:
 - Fast expense/income entry: amount, category, account, date, optional note.
 - Dashboard totals for today, current week, current month and current year, plus previous-month comparison, daily average, budget remaining, category breakdown and recent movements.
 - Movements list with search, filters, edit and delete with undo.
-- Accounts: cash ("Caja") and bank only. Transfers between accounts. No credit cards, no digital wallets.
+- Accounts: cash ("Efectivo") and bank only. Transfers between accounts. No credit cards, no digital wallets.
 - Business categories by default (merchandise, suppliers, freight, fuel, rent, utilities, payroll, taxes, marketing, packaging, maintenance, fees, travel, other) plus income categories (sales, collections, other income). Custom categories with color and icon.
 - Recurring templates shown month by month with pending, paid, skipped and upcoming states; amount editing and per-period skip.
 - Monthly budgets per category, with 80% and 100% alerts.

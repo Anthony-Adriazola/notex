@@ -194,7 +194,7 @@ export function ReportsScreen() {
                 <div>
                   <p className="text-sm text-ink">{account.name}</p>
                   <p className="mt-0.5 font-mono text-[0.625rem] uppercase tracking-[0.1em] text-dim">
-                    {account.kind === "cash" ? "Caja" : "Banco"}
+                    {account.kind === "cash" ? "Efectivo" : "Banco"}
                   </p>
                 </div>
                 <Money

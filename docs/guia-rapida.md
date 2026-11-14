@@ -21,7 +21,7 @@ En el celular, abrir **Notex** como cualquier otra app.
 5. Tocar **Guardar gasto**.
 
 Para un ingreso, elegir **Ingreso** arriba del monto y la categoría (Ventas,
-Cobranzas u Otros ingresos). Para pasar dinero del banco a la caja, elegir
+Cobranzas u Otros ingresos). Para pasar dinero del banco al efectivo, elegir
 **Transferencia**: no cuenta como gasto.
 
 ## Ver los totales

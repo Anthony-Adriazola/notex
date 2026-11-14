@@ -171,7 +171,7 @@ function AccountForm({ onDone }: { onDone: () => void }) {
             value={kind}
             onChange={(event) => setKind(event.target.value as "cash" | "bank")}
           >
-            <option value="cash">Caja</option>
+            <option value="cash">Efectivo</option>
             <option value="bank">Banco</option>
           </Select>
         </Field>
@@ -883,7 +883,7 @@ export function SettingsScreen() {
 
         <Section
           title="Cuentas"
-          description="Caja y banco. Las transferencias mueven saldo sin contar como gasto."
+          description="Efectivo y banco. Las transferencias mueven saldo sin contar como gasto."
           action={
             <Button
               size="sm"
@@ -904,7 +904,7 @@ export function SettingsScreen() {
                 <div className="min-w-0">
                   <p className="truncate text-[15px] text-ink">{account.name}</p>
                   <p className="mt-0.5 font-mono text-[0.625rem] uppercase tracking-[0.1em] text-dim">
-                    {account.kind === "cash" ? "Caja" : "Banco"}
+                    {account.kind === "cash" ? "Efectivo" : "Banco"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
