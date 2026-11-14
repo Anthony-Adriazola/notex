@@ -68,6 +68,7 @@ fn setup_desktop(app: &tauri::App) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
@@ -136,6 +137,14 @@ pub fn run() {
             commands::create_category,
             commands::set_category_budget,
             commands::archive_category,
+            commands::update_concept,
+            commands::monthly_concepts,
+            commands::planned_payments,
+            commands::create_planned_payment,
+            commands::pay_planned_payment,
+            commands::cancel_planned_payment,
+            commands::skip_concept_month,
+            commands::reminders,
             commands::list_budgets,
             commands::set_budget,
             commands::clear_budget,

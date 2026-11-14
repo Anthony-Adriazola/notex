@@ -10,25 +10,27 @@ use crate::models::*;
 const SEED_TIME: &str = "2026-01-01T00:00:00Z";
 const SEED_DEVICE: &str = "seed";
 
-const BUSINESS_CATEGORIES: [(&str, &str, &str, &str, &str); 18] = [
-    ("cat-goods", "Compra de mineral", "expense", "#d9a441", "gem"),
-    ("cat-assay", "Análisis de ley", "expense", "#c99ab0", "flask-conical"),
-    ("cat-suppliers", "Proveedores", "expense", "#c2a184", "handshake"),
-    ("cat-freight", "Fletes y transporte", "expense", "#8aa9c9", "truck"),
-    ("cat-fuel", "Combustible", "expense", "#d98a7d", "fuel"),
-    ("cat-rent", "Alquiler del local", "expense", "#b08d6a", "store"),
-    ("cat-utilities", "Servicios", "expense", "#d9c27a", "zap"),
-    ("cat-payroll", "Sueldos y cargas", "expense", "#a99bc9", "users"),
-    ("cat-taxes", "Impuestos y regalías", "expense", "#9db8d6", "landmark"),
-    ("cat-marketing", "Publicidad", "expense", "#c99ab0", "megaphone"),
-    ("cat-packaging", "Empaques e insumos", "expense", "#8fb996", "package-open"),
-    ("cat-maintenance", "Maquinaria y mantenimiento", "expense", "#9a968f", "wrench"),
-    ("cat-fees", "Comisiones y bancos", "expense", "#b8a27a", "percent"),
-    ("cat-travel", "Viáticos", "expense", "#8aa9c9", "plane"),
-    ("cat-other", "Otros gastos", "expense", "#9a968f", "circle-ellipsis"),
-    ("cat-sales", "Ventas de mineral", "income", "#8fb996", "shopping-bag"),
-    ("cat-collections", "Cobranzas", "income", "#8aa9c9", "hand-coins"),
-    ("cat-other-income", "Otros ingresos", "income", "#9db8d6", "plus-circle"),
+const BUSINESS_CATEGORIES: [(&str, &str, &str, &str, &str, bool, Option<i64>, i64); 20] = [
+    ("cat-goods", "Compra de mineral", "expense", "#d9a441", "gem", false, None, 3),
+    ("cat-assay", "Análisis de ley", "expense", "#c99ab0", "flask-conical", false, None, 3),
+    ("cat-suppliers", "Proveedores", "expense", "#c2a184", "handshake", false, None, 3),
+    ("cat-freight", "Fletes y transporte", "expense", "#8aa9c9", "truck", false, None, 3),
+    ("cat-fuel", "Combustible", "expense", "#d98a7d", "fuel", false, None, 3),
+    ("cat-rent", "Alquiler del local", "expense", "#b08d6a", "store", true, Some(1), 3),
+    ("cat-electricity", "Luz", "expense", "#d9c27a", "zap", true, Some(5), 3),
+    ("cat-wifi", "Internet / Wifi", "expense", "#8aa9c9", "wifi", true, Some(10), 3),
+    ("cat-utilities", "Servicios", "expense", "#d9c27a", "zap", false, None, 3),
+    ("cat-payroll", "Sueldos y cargas", "expense", "#a99bc9", "users", false, None, 3),
+    ("cat-taxes", "Impuestos y regalías", "expense", "#9db8d6", "landmark", false, None, 3),
+    ("cat-marketing", "Publicidad", "expense", "#c99ab0", "megaphone", false, None, 3),
+    ("cat-packaging", "Empaques e insumos", "expense", "#8fb996", "package-open", false, None, 3),
+    ("cat-maintenance", "Maquinaria y mantenimiento", "expense", "#9a968f", "wrench", false, None, 3),
+    ("cat-fees", "Comisiones y bancos", "expense", "#b8a27a", "percent", false, None, 3),
+    ("cat-travel", "Viáticos", "expense", "#8aa9c9", "plane", false, None, 3),
+    ("cat-other", "Otros gastos", "expense", "#9a968f", "circle-ellipsis", false, None, 3),
+    ("cat-sales", "Ventas de mineral", "income", "#8fb996", "shopping-bag", false, None, 3),
+    ("cat-collections", "Cobranzas", "income", "#8aa9c9", "hand-coins", false, None, 3),
+    ("cat-other-income", "Otros ingresos", "income", "#9db8d6", "plus-circle", false, None, 3),
 ];
 
 const OLD_PERSONAL_CATEGORIES: [&str; 9] = [
@@ -207,6 +209,41 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
             "#,
         )?;
     }
+    if version < 3 {
+        conn.execute_batch(
+            r#"
+            ALTER TABLE categories ADD COLUMN monthly INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE categories ADD COLUMN due_day INTEGER;
+            ALTER TABLE categories ADD COLUMN reminder_days INTEGER NOT NULL DEFAULT 3;
+            ALTER TABLE transactions ADD COLUMN payment_method TEXT;
+            UPDATE transactions
+               SET payment_method = CASE WHEN account_id = 'acc-cash' THEN 'cash' ELSE 'qr' END
+             WHERE payment_method IS NULL AND kind IN ('expense','income');
+            CREATE TABLE IF NOT EXISTS concept_skips (
+                concept_id TEXT NOT NULL,
+                month      TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (concept_id, month)
+            );
+            CREATE TABLE IF NOT EXISTS planned_payments (
+                id             TEXT PRIMARY KEY,
+                concept_id     TEXT NOT NULL,
+                amount_cents   INTEGER NOT NULL DEFAULT 0,
+                due_date       TEXT NOT NULL,
+                note           TEXT NOT NULL DEFAULT '',
+                reminder_days  INTEGER NOT NULL DEFAULT 1,
+                status         TEXT NOT NULL DEFAULT 'pending',
+                method         TEXT,
+                transaction_id TEXT,
+                created_at     TEXT NOT NULL,
+                updated_at     TEXT NOT NULL,
+                deleted_at     TEXT,
+                device_id      TEXT NOT NULL
+            );
+            PRAGMA user_version = 3;
+            "#,
+        )?;
+    }
     Ok(())
 }
 
@@ -253,12 +290,16 @@ pub fn seed(conn: &Connection) -> rusqlite::Result<()> {
         )?;
     }
 
-    for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
+    for (id, name, kind, color, icon, monthly, due_day, reminder_days) in BUSINESS_CATEGORIES {
         conn.execute(
             "INSERT OR IGNORE INTO categories
-             (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, ?6, ?6, ?7)",
-            params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
+             (id, name, kind, color, icon, budget_cents, monthly, due_day, reminder_days,
+              archived, created_at, updated_at, device_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, 0, ?9, ?9, ?10)",
+            params![
+                id, name, kind, color, icon, monthly as i64, due_day, reminder_days,
+                SEED_TIME, SEED_DEVICE
+            ],
         )?;
     }
 
@@ -280,12 +321,16 @@ pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
     let now = now_iso();
 
     if get_setting(conn, "business_defaults_v1")?.is_none() {
-        for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
+        for (id, name, kind, color, icon, monthly, due_day, reminder_days) in BUSINESS_CATEGORIES {
             conn.execute(
                 "INSERT OR IGNORE INTO categories
-                 (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, ?6, ?6, ?7)",
-                params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
+                 (id, name, kind, color, icon, budget_cents, monthly, due_day, reminder_days,
+                  archived, created_at, updated_at, device_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, 0, ?9, ?9, ?10)",
+                params![
+                    id, name, kind, color, icon, monthly as i64, due_day, reminder_days,
+                    SEED_TIME, SEED_DEVICE
+                ],
             )?;
         }
         for id in OLD_PERSONAL_CATEGORIES {
@@ -300,12 +345,16 @@ pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
     }
 
     if get_setting(conn, "business_defaults_v2")?.is_none() {
-        for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
+        for (id, name, kind, color, icon, monthly, due_day, reminder_days) in BUSINESS_CATEGORIES {
             conn.execute(
                 "INSERT OR IGNORE INTO categories
-                 (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, ?6, ?6, ?7)",
-                params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
+                 (id, name, kind, color, icon, budget_cents, monthly, due_day, reminder_days,
+                  archived, created_at, updated_at, device_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, 0, ?9, ?9, ?10)",
+                params![
+                    id, name, kind, color, icon, monthly as i64, due_day, reminder_days,
+                    SEED_TIME, SEED_DEVICE
+                ],
             )?;
         }
         let renames = [
@@ -322,6 +371,31 @@ pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
             )?;
         }
         set_setting(conn, "business_defaults_v2", "1")?;
+        changed = true;
+    }
+
+    if get_setting(conn, "business_defaults_v3")?.is_none() {
+        for (id, name, kind, color, icon, monthly, due_day, reminder_days) in BUSINESS_CATEGORIES {
+            conn.execute(
+                "INSERT OR IGNORE INTO categories
+                 (id, name, kind, color, icon, budget_cents, monthly, due_day, reminder_days,
+                  archived, created_at, updated_at, device_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, 0, ?9, ?9, ?10)",
+                params![
+                    id, name, kind, color, icon, monthly as i64, due_day, reminder_days,
+                    SEED_TIME, SEED_DEVICE
+                ],
+            )?;
+            if monthly {
+                conn.execute(
+                    "UPDATE categories
+                        SET monthly = 1, due_day = ?1, reminder_days = ?2, updated_at = ?3
+                      WHERE id = ?4",
+                    params![due_day, reminder_days, &now, id],
+                )?;
+            }
+        }
+        set_setting(conn, "business_defaults_v3", "1")?;
         changed = true;
     }
 
@@ -433,21 +507,40 @@ fn row_category(row: &Row<'_>) -> rusqlite::Result<Category> {
         color: row.get(3)?,
         icon: row.get(4)?,
         budget_cents: row.get(5)?,
-        archived: row.get::<_, i64>(6)? != 0,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
-        deleted_at: row.get(9)?,
-        device_id: row.get(10)?,
+        monthly: row.get::<_, i64>(6)? != 0,
+        due_day: row.get(7)?,
+        reminder_days: row.get(8)?,
+        usage_count: row.get(9)?,
+        last_used: row.get(10)?,
+        last_amount_cents: row.get(11)?,
+        last_method: row.get(12)?,
+        archived: row.get::<_, i64>(13)? != 0,
+        created_at: row.get(14)?,
+        updated_at: row.get(15)?,
+        deleted_at: row.get(16)?,
+        device_id: row.get(17)?,
     })
 }
 
 pub fn list_categories(conn: &Connection, kind: Option<&str>) -> rusqlite::Result<Vec<Category>> {
     let sql = if kind.is_some() {
-        "SELECT id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, deleted_at, device_id
-         FROM categories WHERE deleted_at IS NULL AND kind = ?1 ORDER BY archived, name COLLATE NOCASE"
+        "SELECT c.id, c.name, c.kind, c.color, c.icon, c.budget_cents,
+         c.monthly, c.due_day, c.reminder_days,
+         (SELECT COUNT(*) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT MAX(t.date) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT t.amount_cents FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         (SELECT t.payment_method FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         c.archived, c.created_at, c.updated_at, c.deleted_at, c.device_id
+         FROM categories c WHERE c.deleted_at IS NULL AND c.kind = ?1 ORDER BY c.archived, c.name COLLATE NOCASE"
     } else {
-        "SELECT id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, deleted_at, device_id
-         FROM categories WHERE deleted_at IS NULL ORDER BY kind, archived, name COLLATE NOCASE"
+        "SELECT c.id, c.name, c.kind, c.color, c.icon, c.budget_cents,
+         c.monthly, c.due_day, c.reminder_days,
+         (SELECT COUNT(*) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT MAX(t.date) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT t.amount_cents FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         (SELECT t.payment_method FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         c.archived, c.created_at, c.updated_at, c.deleted_at, c.device_id
+         FROM categories c WHERE c.deleted_at IS NULL ORDER BY c.kind, c.archived, c.name COLLATE NOCASE"
     };
     let mut stmt = conn.prepare(sql)?;
     let rows = if let Some(kind) = kind {
@@ -474,8 +567,9 @@ pub fn create_category(
     let now = now_iso();
     conn.execute(
         "INSERT INTO categories
-         (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?7, ?8)",
+         (id, name, kind, color, icon, budget_cents, monthly, due_day, reminder_days,
+          archived, created_at, updated_at, device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?10, ?11)",
         params![
             id,
             name,
@@ -489,8 +583,14 @@ pub fn create_category(
     )
     .map_err(|e| e.to_string())?;
     conn.query_row(
-        "SELECT id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, deleted_at, device_id
-         FROM categories WHERE id = ?1",
+        "SELECT c.id, c.name, c.kind, c.color, c.icon, c.budget_cents,
+         c.monthly, c.due_day, c.reminder_days,
+         (SELECT COUNT(*) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT MAX(t.date) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT t.amount_cents FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         (SELECT t.payment_method FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         c.archived, c.created_at, c.updated_at, c.deleted_at, c.device_id
+         FROM categories c WHERE c.id = ?1",
         [&id],
         row_category,
     )
@@ -532,17 +632,18 @@ fn row_transaction_row(row: &Row<'_>) -> rusqlite::Result<TransactionRow> {
         recurring_id: row.get(8)?,
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
-        category_name: row.get(11)?,
-        category_color: row.get(12)?,
-        category_icon: row.get(13)?,
-        account_name: row.get(14)?,
-        to_account_name: row.get(15)?,
+        payment_method: row.get(11)?,
+        category_name: row.get(12)?,
+        category_color: row.get(13)?,
+        category_icon: row.get(14)?,
+        account_name: row.get(15)?,
+        to_account_name: row.get(16)?,
     })
 }
 
 const TX_SELECT: &str = r#"
     SELECT t.id, t.kind, t.amount_cents, t.date, t.account_id, t.to_account_id,
-           t.category_id, t.note, t.recurring_id, t.created_at, t.updated_at,
+           t.category_id, t.note, t.recurring_id, t.created_at, t.updated_at, t.payment_method,
            c.name, c.color, c.icon, a.name, ta.name
     FROM transactions t
     LEFT JOIN categories c ON c.id = t.category_id
@@ -601,7 +702,7 @@ pub fn list_transactions(
 pub fn get_transaction(conn: &Connection, id: &str) -> rusqlite::Result<Transaction> {
     conn.query_row(
         "SELECT id, kind, amount_cents, date, account_id, to_account_id, category_id, note,
-                recurring_id, created_at, updated_at, deleted_at, device_id
+                recurring_id, payment_method, created_at, updated_at, deleted_at, device_id
          FROM transactions WHERE id = ?1",
         [id],
         |row| {
@@ -615,10 +716,11 @@ pub fn get_transaction(conn: &Connection, id: &str) -> rusqlite::Result<Transact
                 category_id: row.get(6)?,
                 note: row.get(7)?,
                 recurring_id: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
-                deleted_at: row.get(11)?,
-                device_id: row.get(12)?,
+                payment_method: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+                deleted_at: row.get(12)?,
+                device_id: row.get(13)?,
             })
         },
     )
@@ -638,9 +740,11 @@ pub fn save_transaction(
     if NaiveDate::parse_from_str(&input.date, "%Y-%m-%d").is_err() {
         return Err("La fecha no es válida.".into());
     }
-    if input.account_id.trim().is_empty() {
-        return Err("Elegí una cuenta.".into());
+    let method = input.payment_method.as_deref().unwrap_or("cash");
+    if input.kind != "transfer" && method != "cash" && method != "qr" {
+        return Err("El medio de pago no es válido.".into());
     }
+    let account_id = if method == "cash" { "acc-cash" } else { "acc-bank" };
     if input.kind == "transfer" {
         let to = input.to_account_id.as_deref().unwrap_or("");
         if to.is_empty() || to == input.account_id {
@@ -670,8 +774,8 @@ pub fn save_transaction(
     conn.execute(
         "INSERT INTO transactions
          (id, kind, amount_cents, date, account_id, to_account_id, category_id, note, recurring_id,
-          created_at, updated_at, deleted_at, device_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, ?12)
+          created_at, updated_at, payment_method, deleted_at, device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?13, NULL, ?12)
          ON CONFLICT(id) DO UPDATE SET
              kind = excluded.kind,
              amount_cents = excluded.amount_cents,
@@ -682,19 +786,21 @@ pub fn save_transaction(
              note = excluded.note,
              recurring_id = excluded.recurring_id,
              updated_at = excluded.updated_at,
+             payment_method = excluded.payment_method,
              deleted_at = NULL",
         params![
             id,
             input.kind,
             input.amount_cents,
             input.date,
-            input.account_id,
+            account_id,
             input.to_account_id,
             input.category_id,
             note,
             input.recurring_id,
             created_at,
             now,
+            if input.kind == "transfer" { None } else { Some(method) },
             device_id
         ],
     )
@@ -1244,6 +1350,7 @@ pub fn register_occurrence(
                 .to_string(),
         ),
         recurring_id: Some(item.id),
+        payment_method: None,
     };
     save_transaction(conn, &tx, device_id)
 }
@@ -1292,6 +1399,7 @@ pub fn reports(conn: &Connection, today: NaiveDate) -> rusqlite::Result<Reports>
         months,
         categories: budget_lines(conn, month_start, month_end, &month_key(today))?,
         accounts: list_accounts(conn)?,
+        methods: method_totals(conn, month_start, month_end)?,
     })
 }
 
@@ -1351,8 +1459,14 @@ pub fn backup_to(conn: &Connection, path: &Path) -> rusqlite::Result<()> {
 
 pub fn get_category(conn: &Connection, id: &str) -> rusqlite::Result<Category> {
     conn.query_row(
-        "SELECT id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, deleted_at, device_id
-         FROM categories WHERE id = ?1",
+        "SELECT c.id, c.name, c.kind, c.color, c.icon, c.budget_cents,
+         c.monthly, c.due_day, c.reminder_days,
+         (SELECT COUNT(*) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT MAX(t.date) FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL),
+         (SELECT t.amount_cents FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         (SELECT t.payment_method FROM transactions t WHERE t.category_id = c.id AND t.deleted_at IS NULL ORDER BY t.date DESC, t.created_at DESC LIMIT 1),
+         c.archived, c.created_at, c.updated_at, c.deleted_at, c.device_id
+         FROM categories c WHERE c.id = ?1",
         [id],
         row_category,
     )
@@ -1398,10 +1512,6 @@ mod tests {
             &device,
         )
         .unwrap();
-
-        // La migración de esquema v2 debe conservar el recurrente.
-        conn.execute_batch("PRAGMA user_version = 1;").unwrap();
-        migrate(&conn).unwrap();
 
         let today = NaiveDate::from_ymd_opt(2026, 11, 14).unwrap();
         assert!(month_occurrences(&conn, "2026-11", today).unwrap().is_empty());
@@ -1473,6 +1583,7 @@ mod tests {
                 category_id: Some("cat-food".into()),
                 note: Some("Prueba".into()),
                 recurring_id: None,
+                payment_method: None,
             },
             "test-device",
         )
@@ -1591,4 +1702,393 @@ mod tests {
 
         let _ = std::fs::remove_file(&path);
     }
+}
+
+fn parse_month_key(month: &str) -> Option<(i32, u32)> {
+    let mut parts = month.split('-');
+    let year = parts.next()?.parse::<i32>().ok()?;
+    let month_number = parts.next()?.parse::<u32>().ok()?;
+    if !(1..=12).contains(&month_number) {
+        return None;
+    }
+    Some((year, month_number))
+}
+
+fn concept_due_date(month: &str, due_day: i64) -> Option<NaiveDate> {
+    let (year, month_number) = parse_month_key(month)?;
+    let (_, last) = month_bounds(year, month_number);
+    let day = due_day.clamp(1, last.day() as i64) as u32;
+    NaiveDate::from_ymd_opt(year, month_number, day)
+}
+
+pub fn update_concept(
+    conn: &Connection,
+    id: &str,
+    input: &CategoryInput,
+    device_id: &str,
+) -> Result<Category, String> {
+    let name = input.name.trim();
+    if name.is_empty() {
+        return Err("El concepto necesita un nombre.".into());
+    }
+    if input.monthly && !(1..=31).contains(&input.due_day.unwrap_or(0)) {
+        return Err("Elegí un día de vencimiento entre 1 y 31.".into());
+    }
+    conn.execute(
+        "UPDATE categories SET
+             name = ?1, kind = ?2, color = ?3, icon = ?4, budget_cents = ?5,
+             monthly = ?6, due_day = ?7, reminder_days = ?8, updated_at = ?9, device_id = ?10
+         WHERE id = ?11",
+        params![
+            name,
+            input.kind,
+            input.color,
+            input.icon,
+            input.budget_cents,
+            input.monthly as i64,
+            if input.monthly { input.due_day } else { None },
+            input.reminder_days.unwrap_or(3),
+            now_iso(),
+            device_id,
+            id
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+    get_category(conn, id).map_err(|e| e.to_string())
+}
+
+pub fn skip_concept_month(conn: &Connection, concept_id: &str, month: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO concept_skips (concept_id, month, created_at) VALUES (?1, ?2, ?3)",
+        params![concept_id, month, now_iso()],
+    )?;
+    Ok(())
+}
+
+pub fn monthly_concepts(
+    conn: &Connection,
+    month: &str,
+    _today: NaiveDate,
+) -> rusqlite::Result<Vec<MonthlyConcept>> {
+    let (from, to) = match parse_month_key(month) {
+        Some((year, month_number)) => month_bounds(year, month_number),
+        None => return Ok(Vec::new()),
+    };
+    let mut out = Vec::new();
+    for concept in list_categories(conn, None)?
+        .into_iter()
+        .filter(|concept| concept.monthly && !concept.archived)
+    {
+        let Some(due) = concept_due_date(month, concept.due_day.unwrap_or(1)) else {
+            continue;
+        };
+        let paid_sum: i64 = conn.query_row(
+            "SELECT COALESCE(SUM(amount_cents), 0) FROM transactions
+             WHERE category_id = ?1 AND kind IN ('expense','income') AND deleted_at IS NULL
+               AND date >= ?2 AND date <= ?3",
+            params![concept.id, from.to_string(), to.to_string()],
+            |row| row.get(0),
+        )?;
+        let latest: Option<(String, String)> = conn
+            .query_row(
+                "SELECT id, COALESCE(payment_method, 'cash') FROM transactions
+                 WHERE category_id = ?1 AND kind IN ('expense','income') AND deleted_at IS NULL
+                   AND date >= ?2 AND date <= ?3
+                 ORDER BY date DESC, created_at DESC LIMIT 1",
+                params![concept.id, from.to_string(), to.to_string()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let skipped: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM concept_skips WHERE concept_id = ?1 AND month = ?2",
+            params![concept.id, month],
+            |row| row.get(0),
+        )?;
+        let status = if latest.is_some() {
+            "paid"
+        } else if skipped > 0 {
+            "skipped"
+        } else if due <= _today {
+            "pending"
+        } else {
+            "upcoming"
+        };
+        out.push(MonthlyConcept {
+            concept_id: concept.id,
+            name: concept.name,
+            kind: concept.kind,
+            color: concept.color,
+            icon: concept.icon,
+            due_date: due.to_string(),
+            status: status.into(),
+            paid_amount_cents: if latest.is_some() { Some(paid_sum) } else { None },
+            transaction_id: latest.as_ref().map(|(id, _)| id.clone()),
+            last_amount_cents: concept.last_amount_cents,
+            last_method: latest
+                .map(|(_, method)| method)
+                .or(concept.last_method),
+            reminder_days: concept.reminder_days,
+        });
+    }
+    out.sort_by(|a, b| a.due_date.cmp(&b.due_date).then(a.name.cmp(&b.name)));
+    Ok(out)
+}
+
+fn row_planned(row: &Row<'_>) -> rusqlite::Result<PlannedPayment> {
+    Ok(PlannedPayment {
+        id: row.get(0)?,
+        concept_id: row.get(1)?,
+        amount_cents: row.get(2)?,
+        due_date: row.get(3)?,
+        note: row.get(4)?,
+        reminder_days: row.get(5)?,
+        status: row.get(6)?,
+        method: row.get(7)?,
+        transaction_id: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+        deleted_at: row.get(11)?,
+        device_id: row.get(12)?,
+        concept_name: row.get(13)?,
+        concept_color: row.get(14)?,
+        concept_icon: row.get(15)?,
+    })
+}
+
+const PLANNED_SELECT: &str = r#"
+    SELECT p.id, p.concept_id, p.amount_cents, p.due_date, p.note, p.reminder_days,
+           p.status, p.method, p.transaction_id, p.created_at, p.updated_at, p.deleted_at,
+           p.device_id, c.name, c.color, c.icon
+    FROM planned_payments p
+    LEFT JOIN categories c ON c.id = p.concept_id
+    WHERE p.deleted_at IS NULL
+"#;
+
+pub fn list_planned_payments(
+    conn: &Connection,
+    month: &str,
+) -> rusqlite::Result<Vec<PlannedPayment>> {
+    let (from, to) = match parse_month_key(month) {
+        Some((year, month_number)) => month_bounds(year, month_number),
+        None => return Ok(Vec::new()),
+    };
+    let mut stmt = conn.prepare(&format!(
+        "{PLANNED_SELECT} AND p.status = 'pending' AND p.due_date >= ?1 AND p.due_date <= ?2
+         ORDER BY p.due_date, p.created_at"
+    ))?;
+    let rows = stmt.query_map(params![from.to_string(), to.to_string()], row_planned)?;
+    rows.collect()
+}
+
+pub fn create_planned_payment(
+    conn: &Connection,
+    input: &PlannedPaymentInput,
+    device_id: &str,
+) -> Result<PlannedPayment, String> {
+    if NaiveDate::parse_from_str(&input.due_date, "%Y-%m-%d").is_err() {
+        return Err("La fecha no es válida.".into());
+    }
+    let concept = get_category(conn, &input.concept_id).map_err(|e| e.to_string())?;
+    if concept.archived {
+        return Err("Ese concepto está archivado.".into());
+    }
+    let method = input.method.as_deref().unwrap_or("cash");
+    if method != "cash" && method != "qr" {
+        return Err("El medio de pago no es válido.".into());
+    }
+    let id = new_id();
+    let now = now_iso();
+    conn.execute(
+        "INSERT INTO planned_payments
+         (id, concept_id, amount_cents, due_date, note, reminder_days, status, method,
+          transaction_id, created_at, updated_at, deleted_at, device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?7, NULL, ?8, ?8, NULL, ?9)",
+        params![
+            id,
+            input.concept_id,
+            input.amount_cents.unwrap_or(0),
+            input.due_date,
+            input.note.as_deref().unwrap_or("").trim(),
+            input.reminder_days.unwrap_or(1),
+            method,
+            now,
+            device_id
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+    get_planned_payment(conn, &id).map_err(|e| e.to_string())
+}
+
+pub fn get_planned_payment(conn: &Connection, id: &str) -> rusqlite::Result<PlannedPayment> {
+    conn.query_row(&format!("{PLANNED_SELECT} AND p.id = ?1"), [id], row_planned)
+}
+
+pub fn pay_planned_payment(
+    conn: &Connection,
+    id: &str,
+    amount_cents: i64,
+    method: &str,
+    date: &str,
+    device_id: &str,
+) -> Result<Transaction, String> {
+    let planned = get_planned_payment(conn, id).map_err(|e| e.to_string())?;
+    if planned.status != "pending" {
+        return Err("Ese pendiente ya no está pendiente.".into());
+    }
+    let concept = get_category(conn, &planned.concept_id).map_err(|e| e.to_string())?;
+    let tx = TransactionInput {
+        id: None,
+        kind: concept.kind,
+        amount_cents,
+        date: date.to_string(),
+        account_id: if method == "cash" { "acc-cash".into() } else { "acc-bank".into() },
+        to_account_id: None,
+        category_id: Some(planned.concept_id.clone()),
+        note: Some(planned.note.clone()),
+        recurring_id: None,
+        payment_method: Some(method.to_string()),
+    };
+    let transaction = save_transaction(conn, &tx, device_id)?;
+    conn.execute(
+        "UPDATE planned_payments
+            SET status = 'paid', amount_cents = ?2, method = ?3,
+                transaction_id = ?4, updated_at = ?5
+          WHERE id = ?1",
+        params![id, amount_cents, method, transaction.id, now_iso()],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(transaction)
+}
+
+pub fn cancel_planned_payment(
+    conn: &Connection,
+    id: &str,
+    device_id: &str,
+) -> Result<(), String> {
+    let now = now_iso();
+    conn.execute(
+        "UPDATE planned_payments
+            SET status = 'cancelled', deleted_at = ?2, updated_at = ?2, device_id = ?3
+          WHERE id = ?1",
+        params![id, now, device_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn method_totals(
+    conn: &Connection,
+    from: NaiveDate,
+    to: NaiveDate,
+) -> rusqlite::Result<Vec<MethodTotal>> {
+    let mut stmt = conn.prepare(
+        "SELECT COALESCE(payment_method, 'cash') AS method,
+                COALESCE(SUM(CASE WHEN kind = 'expense' THEN amount_cents ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN kind = 'income' THEN amount_cents ELSE 0 END), 0)
+         FROM transactions
+         WHERE deleted_at IS NULL AND kind IN ('expense','income')
+           AND date >= ?1 AND date <= ?2
+         GROUP BY method
+         ORDER BY method",
+    )?;
+    let rows = stmt.query_map(params![from.to_string(), to.to_string()], |row| {
+        Ok(MethodTotal {
+            method: row.get(0)?,
+            expense_cents: row.get(1)?,
+            income_cents: row.get(2)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn reminders(conn: &Connection, today: NaiveDate) -> rusqlite::Result<Vec<ReminderItem>> {
+    let mut out = Vec::new();
+    let current_month = month_key(today);
+    for concept in list_categories(conn, None)?
+        .into_iter()
+        .filter(|concept| concept.monthly && !concept.archived)
+    {
+        let due_day = concept.due_day.unwrap_or(1);
+        let this_month = concept_due_date(&current_month, due_day).unwrap_or(today);
+        let (from, to) = month_bounds(today.year(), today.month());
+        let paid: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM transactions WHERE category_id = ?1
+             AND kind IN ('expense','income') AND deleted_at IS NULL AND date >= ?2 AND date <= ?3",
+            params![concept.id, from.to_string(), to.to_string()],
+            |row| row.get(0),
+        )?;
+        let skipped: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM concept_skips WHERE concept_id = ?1 AND month = ?2",
+            params![concept.id, current_month],
+            |row| row.get(0),
+        )?;
+        let settled = paid > 0 || skipped > 0;
+        let due = if settled || this_month < today {
+            if settled {
+                let (year, month_number) = if today.month() == 12 {
+                    (today.year() + 1, 1)
+                } else {
+                    (today.year(), today.month() + 1)
+                };
+                let next_month = format!("{year:04}-{month_number:02}");
+                concept_due_date(&next_month, due_day).unwrap_or(today)
+            } else {
+                this_month
+            }
+        } else {
+            this_month
+        };
+        let days_left = (due - today).num_days();
+        if days_left <= concept.reminder_days {
+            out.push(ReminderItem {
+                kind: "concept".into(),
+                concept_id: concept.id,
+                name: concept.name,
+                due_date: due.to_string(),
+                days_left,
+                amount_cents: concept.last_amount_cents,
+                method: concept.last_method,
+                reminder_days: concept.reminder_days,
+            });
+        }
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT p.id, p.concept_id, p.amount_cents, p.due_date, p.note, p.reminder_days,
+                p.method, c.name
+         FROM planned_payments p LEFT JOIN categories c ON c.id = p.concept_id
+         WHERE p.deleted_at IS NULL AND p.status = 'pending'
+           AND p.due_date <= date(?1, '+31 days')",
+    )?;
+    let rows = stmt.query_map(params![today.to_string()], |row| {
+        Ok((
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, i64>(5)?,
+            row.get::<_, Option<String>>(6)?,
+            row.get::<_, Option<String>>(7)?,
+        ))
+    })?;
+    for row in rows {
+        let (concept_id, amount, due_date, reminder_days, method, name) = row?;
+        let Ok(due) = NaiveDate::parse_from_str(&due_date, "%Y-%m-%d") else {
+            continue;
+        };
+        let days_left = (due - today).num_days();
+        if days_left <= reminder_days {
+            out.push(ReminderItem {
+                kind: "planned".into(),
+                concept_id,
+                name: name.unwrap_or_else(|| "Pendiente".into()),
+                due_date,
+                days_left,
+                amount_cents: Some(amount),
+                method,
+                reminder_days,
+            });
+        }
+    }
+    out.sort_by(|a, b| a.days_left.cmp(&b.days_left));
+    Ok(out)
 }

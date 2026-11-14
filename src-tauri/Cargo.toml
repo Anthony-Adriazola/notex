@@ -1,6 +1,6 @@
 [package]
 name = "notex"
-version = "0.1.4"
+version = "0.2.0"
 description = "Gestor de gastos personales para Windows y Android"
 authors = ["Anthony Adriazola"]
 edition = "2024"
@@ -32,6 +32,7 @@ tower-http = { version = "0.7.1", features = ["cors"] }
 if-addrs = "0.15.0"
 rand = "0.10.3"
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "http2", "charset", "query"] }
+tauri-plugin-notification = "2.8.1"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

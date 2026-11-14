@@ -181,7 +181,7 @@ export function BudgetsScreen() {
     <div className="notex-screen">
       <PageHeader
         title="Presupuestos"
-        subtitle="Cuánto planeaste gastar en cada categoría este mes."
+        subtitle="Cuánto planeaste gastar en cada concepto este mes."
         actions={<MonthNav month={month} onChange={setMonth} />}
       />
 
@@ -228,7 +228,7 @@ export function BudgetsScreen() {
         <p className="mt-2 text-xs text-dim">
           {totals.budget > 0
             ? `${pct(totals.spent, totals.budget)}% del presupuesto usado.`
-            : "Asigna un monto a las categorías que quieras controlar."}
+            : "Asigna un monto a los conceptos que quieras controlar."}
         </p>
       </Panel>
 
@@ -242,8 +242,8 @@ export function BudgetsScreen() {
         ) : lines.length === 0 ? (
           <EmptyState
             icon={<Target className="h-4 w-4" strokeWidth={1.75} />}
-            title="Todavía no hay categorías de gasto"
-            description="Crea categorías en Ajustes para poder asignarles un presupuesto."
+            title="Todavía no hay conceptos de gasto"
+            description="Crea conceptos en Ajustes para poder asignarles un presupuesto."
           />
         ) : (
           <div className="divide-y divide-line/70">

@@ -106,7 +106,7 @@ export function MovementsScreen({
             <TextInput
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar nota o categoría"
+              placeholder="Buscar nota o concepto"
               className="pl-9"
               aria-label="Buscar movimientos"
             />
@@ -222,7 +222,9 @@ export function MovementsScreen({
                             <p className="mt-0.5 truncate text-xs text-dim">
                               {isTransfer
                                 ? `${row.accountName ?? ""} → ${row.toAccountName ?? ""}`
-                                : `${row.categoryName ?? "Sin categoría"} · ${row.accountName ?? ""}`}
+                                : `${row.categoryName ?? "Sin concepto"} · ${
+                                    row.paymentMethod === "qr" ? "QR" : "Efectivo"
+                                  }`}
                             </p>
                           </div>
                           <Money

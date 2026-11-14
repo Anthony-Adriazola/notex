@@ -160,7 +160,9 @@ function RecentRows({
               <p className="mt-0.5 truncate text-xs text-dim">
                 {isTransfer
                   ? `${row.accountName ?? ""} → ${row.toAccountName ?? ""}`
-                  : `${row.categoryName ?? "Sin categoría"} · ${row.accountName ?? ""}`}
+                  : `${row.categoryName ?? "Sin concepto"} · ${
+                      row.paymentMethod === "qr" ? "QR" : "Efectivo"
+                    }`}
                 <span className="hidden min-[360px]:inline">
                   {" · "}
                   {fmtDay(row.date)}
@@ -205,7 +207,7 @@ export function DashboardScreen({
   onNavigate: (route: Route) => void;
   onEdit: (row: TransactionRow) => void;
 }) {
-  const { version, pending } = useStore();
+  const { version, pending, reminders } = useStore();
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -239,9 +241,6 @@ export function DashboardScreen({
     .filter((category) => category.spentCents > 0)
     .slice(0, 5);
   const spendingDays = data.week.filter((day) => day.cents > 0).length;
-  const totalBalance = data.accounts
-    .filter((account) => !account.archived)
-    .reduce((sum, account) => sum + account.balanceCents, 0);
 
   return (
     <div className="notex-screen">
@@ -262,6 +261,32 @@ export function DashboardScreen({
         }
       />
 
+      {reminders.length > 0 ? (
+        <button
+          onClick={() => onNavigate("pending")}
+          className="mb-4 flex w-full items-center gap-3 rounded-panel border border-warning/30 bg-warning/[0.06] px-4 py-3 text-left transition-colors hover:bg-warning/[0.1]"
+        >
+          <CalendarClock className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.75} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-ink">
+              {reminders.length === 1
+                ? `${reminders[0].name} vence ${
+                    reminders[0].daysLeft === 0
+                      ? "hoy"
+                      : `en ${reminders[0].daysLeft} ${
+                          reminders[0].daysLeft === 1 ? "día" : "días"
+                        }`
+                  }`
+                : `${reminders.length} pagos están por vencer`}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted">
+              Revisá Pendientes para registrar el pago.
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-dim" strokeWidth={1.75} />
+        </button>
+      ) : null}
+
       {pending.length > 0 ? (
         <button
           onClick={() => onNavigate("pending")}
@@ -271,8 +296,8 @@ export function DashboardScreen({
           <span className="min-w-0 flex-1">
             <span className="block text-sm text-ink">
               {pending.length === 1
-                ? "Tienes un pago recurrente por confirmar este mes"
-                : `Tienes ${pending.length} pagos recurrentes por confirmar este mes`}
+                ? "Tienes un pago mensual por confirmar este mes"
+                : `Tienes ${pending.length} pagos mensuales por confirmar este mes`}
             </span>
             <span className="mt-0.5 block text-xs text-muted">
               Revísalos para que no se queden fuera del mes.
@@ -326,7 +351,7 @@ export function DashboardScreen({
                     ? remaining >= 0
                       ? `Quedan ${fmtMoney(remaining)}`
                       : `Excedido por ${fmtMoney(Math.abs(remaining))}`
-                    : "Define presupuestos por categoría"}
+                    : "Define presupuestos por concepto"}
                 </span>
                 <button
                   onClick={() => onNavigate("budgets")}
@@ -337,23 +362,6 @@ export function DashboardScreen({
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-4 text-xs lg:hidden">
-              {data.accounts
-                .filter((account) => !account.archived)
-                .map((account, index) => (
-                  <span key={account.id} className="flex items-center gap-3">
-                    {index > 0 ? <span className="text-line-strong">·</span> : null}
-                    <span className="text-muted">
-                      {account.name}{" "}
-                      <Money
-                        cents={account.balanceCents}
-                        symbol={false}
-                        className="text-ink"
-                      />
-                    </span>
-                  </span>
-                ))}
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-5 border-t border-line pt-5 lg:grid-cols-1 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
@@ -365,13 +373,6 @@ export function DashboardScreen({
               cents={data.monthIncomeCents}
               tone="positive"
             />
-            <div className="col-span-2 hidden border-t border-line pt-4 lg:block">
-              <Micro>Saldo en cuentas</Micro>
-              <Money
-                cents={totalBalance}
-                className="mt-1.5 block font-mono text-[1.05rem] leading-none"
-              />
-            </div>
           </div>
         </div>
       </Panel>
@@ -398,7 +399,7 @@ export function DashboardScreen({
 
         <Panel className="p-5">
           <div className="flex items-center justify-between">
-            <Micro>Categorías del mes</Micro>
+            <Micro>Conceptos del mes</Micro>
             <button
               onClick={() => onNavigate("reports")}
               className="font-mono text-[0.625rem] uppercase tracking-[0.12em] text-dim hover:text-ink"

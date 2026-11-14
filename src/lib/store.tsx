@@ -14,7 +14,8 @@ import { monthKey } from "./format";
 import type {
   AccountBalance,
   Category,
-  RecurringOccurrence,
+  MonthlyConcept,
+  ReminderItem,
   SyncStatus,
 } from "./types";
 
@@ -22,7 +23,8 @@ interface StoreValue {
   accounts: AccountBalance[];
   categories: Category[];
   settings: Record<string, string>;
-  pending: RecurringOccurrence[];
+  pending: MonthlyConcept[];
+  reminders: ReminderItem[];
   sync: SyncStatus | null;
   syncBusy: boolean;
   version: number;
@@ -40,7 +42,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState<AccountBalance[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
-  const [pending, setPending] = useState<RecurringOccurrence[]>([]);
+  const [pending, setPending] = useState<MonthlyConcept[]>([]);
+  const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [version, setVersion] = useState(0);
@@ -50,17 +53,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextAccounts, nextCategories, nextSettings, nextPending] =
-        await Promise.all([
+      const [
+        nextAccounts,
+        nextCategories,
+        nextSettings,
+        nextPending,
+        nextReminders,
+      ] = await Promise.all([
           api.accounts(),
           api.categories(),
           api.settings(),
-          api.monthOccurrences(monthKey()),
+          api.monthlyConcepts(monthKey()),
+          api.reminders(),
         ]);
       setAccounts(nextAccounts);
       setCategories(nextCategories);
       setSettings(nextSettings);
-      setPending(nextPending.filter((item) => item.status === "pending"));
+      setPending(
+        nextPending.filter((item) => item.status === "pending"),
+      );
+      setReminders(nextReminders);
       setError(null);
       setVersion((value) => value + 1);
     } catch (cause) {
@@ -136,6 +148,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       categories,
       settings,
       pending,
+      reminders,
       sync,
       syncBusy,
       version,
@@ -151,6 +164,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       categories,
       settings,
       pending,
+      reminders,
       sync,
       syncBusy,
       version,

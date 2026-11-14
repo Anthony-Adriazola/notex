@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Archive,
   Copy,
+  Pencil,
   Database,
   Download,
   Plus,
@@ -199,17 +200,26 @@ function AccountForm({ onDone }: { onDone: () => void }) {
 
 function CategoryForm({
   kind,
+  editing,
   onDone,
 }: {
   kind: "expense" | "income";
+  editing?: Category | null;
   onDone: () => void;
 }) {
   const { refresh } = useStore();
   const { show } = useToast();
-  const [name, setName] = useState("");
-  const [color, setColor] = useState(COLORS[0]);
-  const [icon, setIcon] = useState(CATEGORY_ICON_NAMES[0]);
-  const [budget, setBudget] = useState("");
+  const [name, setName] = useState(editing?.name ?? "");
+  const [color, setColor] = useState(editing?.color ?? COLORS[0]);
+  const [icon, setIcon] = useState(editing?.icon ?? CATEGORY_ICON_NAMES[0]);
+  const [budget, setBudget] = useState(
+    editing?.budgetCents
+      ? (editing.budgetCents / 100).toFixed(2).replace(".", ",")
+      : "",
+  );
+  const [monthly, setMonthly] = useState(editing?.monthly ?? false);
+  const [dueDay, setDueDay] = useState(String(editing?.dueDay ?? 5));
+  const [reminder, setReminder] = useState(String(editing?.reminderDays ?? 3));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -221,15 +231,23 @@ function CategoryForm({
     }
     setSaving(true);
     try {
-      await api.createCategory({
+      const input = {
         name: name.trim(),
         kind,
         color,
         icon,
         budgetCents: parseAmountToCents(budget) || null,
-      });
+        monthly,
+        dueDay: monthly ? Number(dueDay) || 1 : null,
+        reminderDays: Number(reminder) || 3,
+      };
+      if (editing) {
+        await api.updateConcept(editing.id, input);
+      } else {
+        await api.createCategory(input);
+      }
       await refresh();
-      show("Categoría creada");
+      show(editing ? "Concepto actualizado" : "Concepto creado");
       onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -280,6 +298,38 @@ function CategoryForm({
             ))}
           </div>
         </Field>
+        <Field label="¿Se paga cada mes?">
+          <Segmented
+            value={monthly ? "yes" : "no"}
+            onChange={(value) => setMonthly(value === "yes")}
+            options={[
+              { value: "no", label: "No" },
+              { value: "yes", label: "Sí" },
+            ]}
+          />
+        </Field>
+        {monthly ? (
+          <>
+            <Field label="Día de vencimiento">
+              <TextInput
+                type="number"
+                min={1}
+                max={31}
+                value={dueDay}
+                onChange={(event) => setDueDay(event.target.value)}
+              />
+            </Field>
+            <Field label="Avisar días antes">
+              <TextInput
+                type="number"
+                min={0}
+                max={30}
+                value={reminder}
+                onChange={(event) => setReminder(event.target.value)}
+              />
+            </Field>
+          </>
+        ) : null}
         <Field label="Presupuesto mensual (opcional)">
           <TextInput
             value={budget}
@@ -301,7 +351,7 @@ function CategoryForm({
       {error ? <p className="mt-3 text-sm text-negative">{error}</p> : null}
       <div className="mt-4 flex gap-2">
         <Button variant="primary" size="sm" onClick={() => void submit()} disabled={saving}>
-          {saving ? "Guardando…" : "Guardar categoría"}
+          {saving ? "Guardando…" : "Guardar concepto"}
         </Button>
         <Button variant="ghost" size="sm" onClick={onDone}>
           Cancelar
@@ -768,6 +818,7 @@ export function SettingsScreen() {
   } | null>(null);
   const [archiving, setArchiving] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
   const [categoryKind, setCategoryKind] = useState<"expense" | "income">(
     "expense",
@@ -884,7 +935,8 @@ export function SettingsScreen() {
           </div>
         </Section>
 
-        <Section
+        {false ? (
+<Section
           title="Cuentas"
           description="Efectivo y banco. Las transferencias mueven saldo sin contar como gasto."
           action={
@@ -933,14 +985,19 @@ export function SettingsScreen() {
           ) : null}
         </Section>
 
-        <Section
-          title="Categorías"
-          description="Cada gasto entra en una categoría. El presupuesto mensual es el valor por defecto."
+        ) : null}
+
+<Section
+          title="Conceptos"
+          description="Lo que pagás. Si se paga cada mes, elegí el día y los días de aviso. El presupuesto es opcional."
           action={
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setShowCategoryForm((value) => !value)}
+              onClick={() => {
+                setEditingCategory(null);
+                setShowCategoryForm((value) => !value);
+              }}
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
               Agregar
@@ -984,9 +1041,12 @@ export function SettingsScreen() {
                         {category.name}
                       </p>
                       <p className="mt-0.5 text-xs text-dim">
+                        {category.monthly
+                          ? `Cada mes · día ${category.dueDay ?? 1}`
+                          : "Cuando lo uses"}
                         {category.budgetCents
-                          ? `Presupuesto ${fmtMoney(category.budgetCents)}`
-                          : "Sin presupuesto por defecto"}
+                          ? ` · ${fmtMoney(category.budgetCents)}`
+                          : ""}
                       </p>
                     </div>
                   </div>
@@ -1020,6 +1080,15 @@ export function SettingsScreen() {
                       />
                     </label>
                     <IconButton
+                      label={`Editar ${category.name}`}
+                      onClick={() => {
+                        setEditingCategory(category);
+                        setShowCategoryForm(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" strokeWidth={1.75} />
+                    </IconButton>
+                    <IconButton
                       label={`Archivar ${category.name}`}
                       onClick={() =>
                         askArchive("category", category.id, category.name)
@@ -1033,13 +1102,19 @@ export function SettingsScreen() {
           </div>
           {showCategoryForm ? (
             <CategoryForm
+              key={editingCategory?.id ?? "new"}
               kind={categoryKind}
-              onDone={() => setShowCategoryForm(false)}
+              editing={editingCategory}
+              onDone={() => {
+                setShowCategoryForm(false);
+                setEditingCategory(null);
+              }}
             />
           ) : null}
         </Section>
 
-        <Section
+        {false ? (
+<Section
           title="Recurrentes"
           description="Alquiler, servicios o suscripciones. Aparecen en Pendientes para que confirmes el monto."
           action={
@@ -1117,7 +1192,9 @@ export function SettingsScreen() {
           ) : null}
         </Section>
 
-        <SyncSection />
+        ) : null}
+
+<SyncSection />
 
         <Section
           title="Datos y respaldo"

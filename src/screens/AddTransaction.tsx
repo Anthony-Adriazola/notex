@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
 import { CategoryIcon } from "../lib/icons";
 import { api } from "../lib/api";
-import {
-  fmtAmount,
-  parseAmountToCents,
-  todayISO,
-} from "../lib/format";
+import { fmtAmount, parseAmountToCents, todayISO } from "../lib/format";
 import { useStore } from "../lib/store";
-import type { TransactionRow, TxKind } from "../lib/types";
+import type { CategoryInput, TransactionRow, TxKind } from "../lib/types";
 import {
   Button,
   Field,
@@ -17,23 +13,18 @@ import {
   PageHeader,
   Panel,
   Segmented,
-  Select,
   TextInput,
   cx,
 } from "../components/ui";
 
 function cleanAmount(value: string): string {
   let next = value.replace(/[^\d.,]/g, "");
-  if (next.includes(",")) {
-    next = next.replace(/\./g, "");
-  } else {
-    next = next.replace(/\./g, ",");
-  }
+  if (next.includes(",")) next = next.replace(/\./g, "");
+  else next = next.replace(/\./g, ",");
   const [wholePart = "", ...rest] = next.split(",");
   const whole = wholePart.slice(0, 9);
   if (rest.length === 0) return whole;
-  const fraction = rest.join("").slice(0, 2);
-  return `${whole || "0"},${fraction}`;
+  return `${whole || "0"},${rest.join("").slice(0, 2)}`;
 }
 
 export function AddTransactionScreen({
@@ -41,87 +32,92 @@ export function AddTransactionScreen({
   onSaved,
   onCancel,
   onDelete,
-  onOpenSettings,
 }: {
   editing: TransactionRow | null;
   onSaved: () => void;
   onCancel: () => void;
   onDelete: (row: TransactionRow) => void;
-  onOpenSettings: () => void;
 }) {
-  const { accounts, categories } = useStore();
-  const activeAccounts = useMemo(
-    () => accounts.filter((account) => !account.archived),
-    [accounts],
-  );
+  const { categories, refresh } = useStore();
   const amountRef = useRef<HTMLInputElement>(null);
 
-  const [kind, setKind] = useState<TxKind>(editing?.kind ?? "expense");
+  const [kind, setKind] = useState<TxKind>(
+    editing?.kind === "income" ? "income" : "expense",
+  );
   const [amount, setAmount] = useState(
     editing ? (editing.amountCents / 100).toFixed(2).replace(".", ",") : "",
   );
+  const [method, setMethod] = useState<"cash" | "qr">(
+    editing?.paymentMethod === "qr" ? "qr" : "cash",
+  );
   const [categoryId, setCategoryId] = useState(editing?.categoryId ?? "");
-  const [accountId, setAccountId] = useState(editing?.accountId ?? "");
-  const [toAccountId, setToAccountId] = useState(editing?.toAccountId ?? "");
   const [date, setDate] = useState(editing?.date ?? todayISO());
   const [note, setNote] = useState(editing?.note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showNewConcept, setShowNewConcept] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newMonthly, setNewMonthly] = useState(false);
+  const [newDueDay, setNewDueDay] = useState("5");
+  const [newReminder, setNewReminder] = useState("3");
+  const [creating, setCreating] = useState(false);
 
   const categoryKind: "expense" | "income" =
     kind === "income" ? "income" : "expense";
   const visibleCategories = useMemo(
     () =>
-      categories.filter(
-        (category) => category.kind === categoryKind && !category.archived,
-      ),
+      categories
+        .filter(
+          (category) => category.kind === categoryKind && !category.archived,
+        )
+        .sort(
+          (a, b) =>
+            (b.usageCount ?? 0) - (a.usageCount ?? 0) ||
+            (b.lastUsed ?? "").localeCompare(a.lastUsed ?? "") ||
+            a.name.localeCompare(b.name),
+        ),
     [categories, categoryKind],
   );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       amountRef.current?.focus();
-      amountRef.current?.select();
     }, 250);
     return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (kind === "transfer") return;
+    if (!categoryId) return;
     if (visibleCategories.some((category) => category.id === categoryId)) return;
-    const remembered = window.localStorage.getItem(
-      `notex.lastCategory.${categoryKind}`,
-    );
-    const next =
-      visibleCategories.find((category) => category.id === remembered) ??
-      visibleCategories[0];
-    setCategoryId(next?.id ?? "");
-  }, [categoryId, categoryKind, kind, visibleCategories]);
-
-  useEffect(() => {
-    if (activeAccounts.some((account) => account.id === accountId)) return;
-    const remembered = window.localStorage.getItem("notex.lastAccount");
-    const next =
-      activeAccounts.find((account) => account.id === remembered) ??
-      activeAccounts.find((account) => account.kind === "cash") ??
-      activeAccounts[0];
-    setAccountId(next?.id ?? "");
-  }, [accountId, activeAccounts]);
-
-  useEffect(() => {
-    if (kind !== "transfer") return;
-    if (
-      toAccountId &&
-      toAccountId !== accountId &&
-      activeAccounts.some((account) => account.id === toAccountId)
-    ) {
-      return;
-    }
-    const next = activeAccounts.find((account) => account.id !== accountId);
-    setToAccountId(next?.id ?? "");
-  }, [accountId, activeAccounts, kind, toAccountId]);
+    setCategoryId("");
+  }, [categoryId, visibleCategories]);
 
   const amountCents = parseAmountToCents(amount);
+
+  const createConcept = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const input: CategoryInput = {
+        name: newName.trim(),
+        kind: categoryKind,
+        color: "#d9a441",
+        icon: "circle-ellipsis",
+        monthly: newMonthly,
+        dueDay: newMonthly ? Number(newDueDay) || 1 : null,
+        reminderDays: Number(newReminder) || 3,
+      };
+      const created = await api.createCategory(input);
+      await refresh();
+      setCategoryId(created.id);
+      setShowNewConcept(false);
+      setNewName("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const save = useCallback(async () => {
     setError(null);
@@ -130,16 +126,8 @@ export function AddTransactionScreen({
       amountRef.current?.focus();
       return;
     }
-    if (!date) {
-      setError("Elige una fecha.");
-      return;
-    }
-    if (kind !== "transfer" && !categoryId) {
-      setError("Elige una categoría.");
-      return;
-    }
-    if (kind === "transfer" && (!toAccountId || toAccountId === accountId)) {
-      setError("Elige dos cuentas distintas para la transferencia.");
+    if (!categoryId) {
+      setError("Elige qué estás pagando.");
       return;
     }
     setSaving(true);
@@ -149,16 +137,14 @@ export function AddTransactionScreen({
         kind,
         amountCents,
         date,
-        accountId,
-        toAccountId: kind === "transfer" ? toAccountId : null,
-        categoryId: kind === "transfer" ? null : categoryId,
+        accountId: method === "cash" ? "acc-cash" : "acc-bank",
+        toAccountId: null,
+        categoryId,
         note: note.trim() || null,
         recurringId: editing?.recurringId ?? null,
+        paymentMethod: method,
       });
-      if (kind !== "transfer") {
-        window.localStorage.setItem(`notex.lastCategory.${kind}`, categoryId);
-      }
-      window.localStorage.setItem("notex.lastAccount", accountId);
+      window.localStorage.setItem("notex.lastAccount", method);
       onSaved();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -166,105 +152,27 @@ export function AddTransactionScreen({
       setSaving(false);
     }
   }, [
-    accountId,
     amountCents,
     categoryId,
     date,
     editing,
     kind,
+    method,
     note,
     onSaved,
-    toAccountId,
   ]);
 
-  const title = editing ? "Editar movimiento" : "Nuevo movimiento";
   const saveLabel = editing
     ? "Guardar cambios"
     : kind === "income"
       ? "Guardar ingreso"
-      : kind === "transfer"
-        ? "Guardar transferencia"
-        : "Guardar gasto";
-
-  const details = (
-    <Panel className="p-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={kind === "transfer" ? "Desde" : "Cuenta"}>
-          <Select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-            {activeAccounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        {kind === "transfer" ? (
-          <Field label="Hacia">
-            <Select
-              value={toAccountId}
-              onChange={(event) => setToAccountId(event.target.value)}
-            >
-              {activeAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        ) : (
-          <Field label="Fecha">
-            <TextInput
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-            />
-          </Field>
-        )}
-        {kind === "transfer" ? (
-          <Field label="Fecha">
-            <TextInput
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-            />
-          </Field>
-        ) : null}
-        <Field
-          label="Nota (opcional)"
-          className={kind === "transfer" ? "" : "sm:col-span-2"}
-        >
-          <TextInput
-            value={note}
-            maxLength={140}
-            placeholder="Ej. flete, análisis de ley, recibo de luz"
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </Field>
-      </div>
-      {activeAccounts.length < 2 && kind === "transfer" ? (
-        <p className="mt-4 text-sm text-warning">
-          Necesitas dos cuentas para transferir.{" "}
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="underline decoration-line-strong underline-offset-4 hover:text-ink"
-          >
-            Crear una cuenta
-          </button>
-        </p>
-      ) : null}
-    </Panel>
-  );
+      : "Guardar gasto";
 
   return (
     <div className="notex-screen">
       <PageHeader
-        title={title}
-        subtitle={
-          editing
-            ? "Corrige el monto, la categoría o la fecha."
-            : "Escribe el monto con el teclado; el resto tiene valores por defecto."
-        }
+        title={editing ? "Editar movimiento" : "Nuevo movimiento"}
+        subtitle="Escribe el monto, elige qué estás pagando y con qué medio."
         actions={
           <Button variant="ghost" onClick={onCancel}>
             <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
@@ -286,7 +194,6 @@ export function AddTransactionScreen({
           options={[
             { value: "expense", label: "Gasto" },
             { value: "income", label: "Ingreso" },
-            { value: "transfer", label: "Transferencia" },
           ]}
         />
 
@@ -304,7 +211,6 @@ export function AddTransactionScreen({
               placeholder="0"
               aria-label="Monto en bolivianos"
               onChange={(event) => setAmount(cleanAmount(event.target.value))}
-              onFocus={(event) => event.currentTarget.select()}
               onBlur={() => {
                 if (amountCents > 0) setAmount(fmtAmount(amountCents));
               }}
@@ -312,54 +218,151 @@ export function AddTransactionScreen({
             />
           </div>
           <p className="mt-3 text-xs text-dim">
-            Escribí con el teclado del celular o de la laptop. Usá coma para los
-            centavos.
+            Se escribe desde cero. Usá coma para los centavos.
           </p>
         </Panel>
 
-        {kind === "transfer" ? null : (
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <Micro>Categoría</Micro>
-              <span className="text-xs text-dim">
-                {visibleCategories.length} disponibles
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {visibleCategories.map((category) => {
-                const selected = category.id === categoryId;
-                return (
-                  <button
-                    key={category.id}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => setCategoryId(category.id)}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <Micro>¿Qué estás pagando?</Micro>
+            <span className="text-xs text-dim">
+              {visibleCategories.length} conceptos
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {visibleCategories.map((category) => {
+              const selected = category.id === categoryId;
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setCategoryId(category.id)}
+                  className={cx(
+                    "flex min-h-[4.75rem] flex-col items-start justify-between rounded-lg border p-2.5 text-left transition-colors",
+                    selected
+                      ? "border-ink bg-raised"
+                      : "border-line bg-panel hover:border-line-strong hover:bg-raised/70",
+                  )}
+                >
+                  <span style={{ color: category.color }}>
+                    <CategoryIcon name={category.icon} className="h-4 w-4" />
+                  </span>
+                  <span
                     className={cx(
-                      "flex min-h-[4.75rem] flex-col items-start justify-between rounded-lg border p-2.5 text-left transition-colors",
-                      selected
-                        ? "border-ink bg-raised"
-                        : "border-line bg-panel hover:border-line-strong hover:bg-raised/70",
+                      "w-full break-words text-[11px] leading-[1.2]",
+                      selected ? "text-ink" : "text-muted",
                     )}
                   >
-                    <span style={{ color: category.color }}>
-                      <CategoryIcon name={category.icon} className="h-4 w-4" />
-                    </span>
-                    <span
-                      className={cx(
-                        "w-full break-words text-[11px] leading-[1.2]",
-                        selected ? "text-ink" : "text-muted",
-                      )}
-                    >
-                      {category.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                    {category.name}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setShowNewConcept((value) => !value)}
+              className="flex min-h-[4.75rem] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line-strong bg-transparent text-muted transition-colors hover:border-ink hover:text-ink"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2} />
+              <span className="text-[11px]">Nuevo</span>
+            </button>
           </div>
-        )}
+        </div>
 
-        {details}
+        {showNewConcept ? (
+          <Panel className="border-line-strong p-4">
+            <Micro>Nuevo concepto</Micro>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Nombre">
+                <TextInput
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                  placeholder="Ej. Análisis de ley"
+                />
+              </Field>
+              <Field label="¿Se paga cada mes?">
+                <Segmented
+                  value={newMonthly ? "yes" : "no"}
+                  onChange={(value) => setNewMonthly(value === "yes")}
+                  options={[
+                    { value: "no", label: "No" },
+                    { value: "yes", label: "Sí" },
+                  ]}
+                />
+              </Field>
+              {newMonthly ? (
+                <>
+                  <Field label="Día de vencimiento">
+                    <TextInput
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={newDueDay}
+                      onChange={(event) => setNewDueDay(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Avisar días antes">
+                    <TextInput
+                      type="number"
+                      min={0}
+                      max={30}
+                      value={newReminder}
+                      onChange={(event) => setNewReminder(event.target.value)}
+                    />
+                  </Field>
+                </>
+              ) : null}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void createConcept()}
+                disabled={creating || !newName.trim()}
+              >
+                {creating ? "Creando…" : "Crear concepto"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowNewConcept(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </Panel>
+        ) : null}
+
+        <Panel className="p-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Medio de pago">
+              <Segmented
+                value={method}
+                onChange={setMethod}
+                options={[
+                  { value: "cash", label: "Efectivo" },
+                  { value: "qr", label: "QR" },
+                ]}
+              />
+            </Field>
+            <Field label="Fecha">
+              <TextInput
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+              />
+            </Field>
+            <Field label="Nota (opcional)" className="sm:col-span-2">
+              <TextInput
+                value={note}
+                maxLength={140}
+                placeholder="Ej. factura, proveedor, análisis"
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </Field>
+          </div>
+        </Panel>
 
         {error ? (
           <div
@@ -375,7 +378,7 @@ export function AddTransactionScreen({
             type="submit"
             variant="primary"
             size="lg"
-            disabled={saving || amountCents <= 0}
+            disabled={saving || amountCents <= 0 || !categoryId}
             className="flex-1"
           >
             {saving ? "Guardando…" : saveLabel}

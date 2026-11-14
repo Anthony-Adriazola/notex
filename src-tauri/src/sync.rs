@@ -608,6 +608,7 @@ mod tests {
                 category_id: Some("cat-food".into()),
                 note: Some("Desde el cliente de prueba".into()),
                 recurring_id: None,
+                payment_method: None,
             },
             &device_id,
         )

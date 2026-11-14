@@ -9,7 +9,10 @@ import type {
   Category,
   CategoryInput,
   Dashboard,
+  MonthlyConcept,
   Occurrence,
+  PlannedPayment,
+  ReminderItem,
   Recurring,
   RecurringInput,
   RecurringOccurrence,
@@ -89,6 +92,45 @@ export const api = {
     invoke<void>("skip_occurrence", { recurringId, dueDate }),
 
   reports: () => invoke<Reports>("reports"),
+
+  updateConcept: (id: string, input: CategoryInput) =>
+    invoke<Category>("update_concept", { id, input }),
+
+  monthlyConcepts: (month: string) =>
+    invoke<MonthlyConcept[]>("monthly_concepts", { month }),
+
+  plannedPayments: (month: string) =>
+    invoke<PlannedPayment[]>("planned_payments", { month }),
+
+  createPlannedPayment: (input: {
+    conceptId: string;
+    amountCents?: number | null;
+    dueDate: string;
+    note?: string | null;
+    reminderDays?: number | null;
+    method?: string | null;
+  }) => invoke<PlannedPayment>("create_planned_payment", { input }),
+
+  payPlannedPayment: (
+    id: string,
+    amountCents: number,
+    method: string,
+    date: string,
+  ) =>
+    invoke<Transaction>("pay_planned_payment", {
+      id,
+      amountCents,
+      method,
+      date,
+    }),
+
+  cancelPlannedPayment: (id: string) =>
+    invoke<void>("cancel_planned_payment", { id }),
+
+  skipConceptMonth: (conceptId: string, month: string) =>
+    invoke<void>("skip_concept_month", { conceptId, month }),
+
+  reminders: () => invoke<ReminderItem[]>("reminders"),
 
   settings: () => invoke<Record<string, string>>("get_settings"),
 

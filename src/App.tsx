@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 
 import { ToastProvider, useToast } from "./components/Toast";
 import { Shell } from "./components/Shell";
 import { api } from "./lib/api";
+import { todayISO } from "./lib/format";
 import { StoreProvider, useStore } from "./lib/store";
 import type { Route, TransactionRow } from "./lib/types";
 import { AddTransactionScreen } from "./screens/AddTransaction";
@@ -26,6 +32,40 @@ const ROUTES: Route[] = [
 function routeFromLocation(): Route {
   const value = window.location.hash.replace(/^#\/?/, "");
   return ROUTES.includes(value as Route) ? (value as Route) : "dashboard";
+}
+
+function ReminderNotifier() {
+  const { reminders } = useStore();
+
+  useEffect(() => {
+    if (reminders.length === 0) return;
+    const key = `notex.notified.${todayISO()}`;
+    if (window.localStorage.getItem(key)) return;
+    let cancelled = false;
+    void (async () => {
+      let granted = await isPermissionGranted();
+      if (!granted) {
+        granted = (await requestPermission()) === "granted";
+      }
+      if (!granted || cancelled) return;
+      const body = reminders
+        .map((item) =>
+          `${item.name} vence ${
+            item.daysLeft === 0
+              ? "hoy"
+              : `en ${item.daysLeft} ${item.daysLeft === 1 ? "día" : "días"}`
+          }`,
+        )
+        .join(" · ");
+      sendNotification({ title: "Notex", body });
+      window.localStorage.setItem(key, "1");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reminders]);
+
+  return null;
 }
 
 function Workspace() {
@@ -127,7 +167,6 @@ function Workspace() {
               go(back, false);
             }}
             onDelete={(row) => void remove(row)}
-            onOpenSettings={() => navigate("settings")}
           />
         );
       case "pending":
@@ -162,6 +201,7 @@ export default function App() {
   return (
     <StoreProvider>
       <ToastProvider>
+        <ReminderNotifier />
         <Workspace />
       </ToastProvider>
     </StoreProvider>

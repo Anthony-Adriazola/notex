@@ -12,7 +12,7 @@ import {
 import { fmtRelative } from "../lib/format";
 import { useStore } from "../lib/store";
 import type { Route } from "../lib/types";
-import { Money, cx } from "./ui";
+import { cx } from "./ui";
 
 const NAV = [
   { route: "dashboard" as Route, label: "Resumen", icon: LayoutDashboard },
@@ -137,7 +137,7 @@ export function Shell({
   onNavigate: (route: Route) => void;
   children: ReactNode;
 }) {
-  const { pending, accounts } = useStore();
+  const { pending } = useStore();
   const pendingCount = pending.length;
 
   return (
@@ -187,34 +187,6 @@ export function Shell({
             );
           })}
         </nav>
-
-        <div className="mt-6 border-t border-line pt-5">
-          <div className="flex items-center justify-between px-3">
-            <span className="micro">Cuentas</span>
-            <button
-              onClick={() => onNavigate("settings")}
-              className="font-mono text-[0.625rem] uppercase tracking-[0.12em] text-dim hover:text-ink"
-            >
-              Editar
-            </button>
-          </div>
-          <div className="mt-2 flex flex-col">
-            {accounts
-              .filter((account) => !account.archived)
-              .map((account) => (
-                <div
-                  key={account.id}
-                  className="flex items-center justify-between px-3 py-1.5"
-                >
-                  <span className="text-sm text-muted">{account.name}</span>
-                  <Money
-                    cents={account.balanceCents}
-                    className="text-[13px] text-ink"
-                  />
-                </div>
-              ))}
-          </div>
-        </div>
 
         <div className="mt-auto flex flex-col gap-2 pt-6">
           <SyncStatus onNavigate={onNavigate} />

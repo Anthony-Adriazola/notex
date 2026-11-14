@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, ChevronRight, X } from "lucide-react";
 
 import { CategoryIcon } from "../lib/icons";
@@ -14,9 +14,8 @@ import {
 import { useStore } from "../lib/store";
 import { useToast } from "../components/Toast";
 import type {
-  OccurrenceStatus,
-  Recurring,
-  RecurringOccurrence,
+  MonthlyConcept,
+  PlannedPayment,
   Route,
 } from "../lib/types";
 import {
@@ -27,11 +26,13 @@ import {
   MonthNav,
   PageHeader,
   Panel,
+  Segmented,
+  Select,
   TextInput,
 } from "../components/ui";
 
 const STATUS: Record<
-  OccurrenceStatus,
+  MonthlyConcept["status"],
   { label: string; className: string }
 > = {
   pending: {
@@ -52,7 +53,7 @@ const STATUS: Record<
   },
 };
 
-function StatusChip({ status }: { status: OccurrenceStatus }) {
+function StatusChip({ status }: { status: MonthlyConcept["status"] }) {
   const config = STATUS[status];
   return (
     <span
@@ -63,24 +64,26 @@ function StatusChip({ status }: { status: OccurrenceStatus }) {
   );
 }
 
-function OccurrenceRow({
+function ConceptRow({
   item,
-  draft,
+  amount,
+  method,
   busy,
-  onDraft,
+  onAmount,
+  onMethod,
   onRegister,
   onSkip,
 }: {
-  item: RecurringOccurrence;
-  draft: string;
+  item: MonthlyConcept;
+  amount: string;
+  method: "cash" | "qr";
   busy: boolean;
-  onDraft: (value: string) => void;
+  onAmount: (value: string) => void;
+  onMethod: (value: "cash" | "qr") => void;
   onRegister: () => void;
   onSkip: () => void;
 }) {
   const actionable = item.status === "pending" || item.status === "upcoming";
-  const amount = item.paidAmountCents ?? item.amountCents;
-
   return (
     <div className="px-4 py-4 sm:px-5">
       <div className="flex items-start gap-3">
@@ -97,13 +100,12 @@ function OccurrenceRow({
             <div className="min-w-0">
               <p className="truncate text-[15px] text-ink">{item.name}</p>
               <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-dim">
-                <span style={{ color: item.categoryColor }}>
-                  <CategoryIcon
-                    name={item.categoryIcon}
-                    className="h-3 w-3"
-                  />
+                <span style={{ color: item.color }}>
+                  <CategoryIcon name={item.icon} className="h-3 w-3" />
                 </span>
-                {item.categoryName} · {item.accountName}
+                {item.status === "paid" && item.paidAmountCents !== null
+                  ? `Pagado ${fmtDay(item.dueDate)}`
+                  : `${item.reminderDays} días de aviso`}
               </p>
             </div>
             <StatusChip status={item.status} />
@@ -113,23 +115,34 @@ function OccurrenceRow({
 
       {actionable ? (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="block sm:w-36">
+          <label className="block sm:w-32">
             <Micro className="mb-1.5 block">Monto</Micro>
             <TextInput
-              value={draft}
+              value={amount}
               inputMode="decimal"
-              onChange={(event) => onDraft(event.target.value)}
+              onChange={(event) => onAmount(event.target.value)}
               aria-label={`Monto de ${item.name}`}
             />
           </label>
+          <div className="sm:w-44">
+            <Micro className="mb-1.5 block">Medio</Micro>
+            <Segmented
+              value={method}
+              onChange={onMethod}
+              options={[
+                { value: "cash", label: "Efectivo" },
+                { value: "qr", label: "QR" },
+              ]}
+            />
+          </div>
           <div className="flex flex-1 gap-2 sm:justify-end">
             <Button
               variant="primary"
               onClick={onRegister}
-              disabled={busy || parseAmountToCents(draft) <= 0}
+              disabled={busy || parseAmountToCents(amount) <= 0}
             >
               <Check className="h-4 w-4" strokeWidth={2.25} />
-              {item.status === "upcoming" ? "Pagar ahora" : "Registrar"}
+              Registrar
             </Button>
             <Button variant="ghost" onClick={onSkip} disabled={busy}>
               <X className="h-4 w-4" strokeWidth={2} />
@@ -145,7 +158,7 @@ function OccurrenceRow({
               : "Saltado este mes"}
           </span>
           <Money
-            cents={amount}
+            cents={item.paidAmountCents ?? item.lastAmountCents ?? 0}
             symbol={false}
             className={
               item.status === "paid"
@@ -159,23 +172,62 @@ function OccurrenceRow({
   );
 }
 
-function Group({
-  title,
-  items,
-  children,
+function PlannedRow({
+  item,
+  busy,
+  onPay,
+  onCancel,
 }: {
-  title: string;
-  items: RecurringOccurrence[];
-  children: ReactNode;
+  item: PlannedPayment;
+  busy: boolean;
+  onPay: () => void;
+  onCancel: () => void;
 }) {
-  if (items.length === 0) return null;
   return (
-    <div>
-      <div className="flex items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-2 first:border-t-0">
-        <Micro>{title}</Micro>
-        <span className="num text-xs text-dim">{items.length}</span>
+    <div className="px-4 py-4 sm:px-5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg border border-warning/30 bg-warning/[0.06]">
+          <span className="num text-sm leading-none text-warning">
+            {item.dueDate.slice(8, 10)}
+          </span>
+          <span className="mt-0.5 font-mono text-[0.5625rem] uppercase text-dim">
+            {monthShort(item.dueDate)}
+          </span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] text-ink">
+            {item.conceptName ?? "Pendiente"}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-dim">
+            {item.note || "Pago puntual"} ·{" "}
+            {item.method === "qr" ? "QR" : "Efectivo"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-dim">
+            Aviso {item.reminderDays} día{item.reminderDays === 1 ? "" : "s"}{" "}
+            antes
+          </p>
+        </div>
+        <Money
+          cents={item.amountCents}
+          symbol={false}
+          className="shrink-0 font-mono text-sm"
+        />
       </div>
-      <div className="divide-y divide-line/70">{children}</div>
+      <div className="mt-3 flex gap-2">
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={onPay}
+          disabled={busy || item.amountCents <= 0}
+        >
+          <Check className="h-4 w-4" strokeWidth={2.25} />
+          Pagar
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
+          <X className="h-4 w-4" strokeWidth={2} />
+          Cancelar
+        </Button>
+      </div>
     </div>
   );
 }
@@ -185,34 +237,38 @@ export function PendingScreen({
 }: {
   onNavigate: (route: Route) => void;
 }) {
-  const { version, refresh } = useStore();
+  const { categories, version, refresh, reminders } = useStore();
   const { show } = useToast();
   const [month, setMonth] = useState(monthKey());
-  const [items, setItems] = useState<RecurringOccurrence[]>([]);
+  const [items, setItems] = useState<MonthlyConcept[]>([]);
+  const [planned, setPlanned] = useState<PlannedPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [methods, setMethods] = useState<Record<string, "cash" | "qr">>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
-  const [templates, setTemplates] = useState<Recurring[]>([]);
-  const [templateDrafts, setTemplateDrafts] = useState<Record<string, string>>(
-    {},
-  );
-  const [templateDates, setTemplateDates] = useState<Record<string, string>>(
-    {},
-  );
-  const [templateBusy, setTemplateBusy] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [showPlannedForm, setShowPlannedForm] = useState(false);
+  const [newConceptId, setNewConceptId] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [newDate, setNewDate] = useState(todayISO());
+  const [newNote, setNewNote] = useState("");
+  const [newReminder, setNewReminder] = useState("1");
+  const [newMethod, setNewMethod] = useState<"cash" | "qr">("cash");
+  const [creating, setCreating] = useState(false);
 
-  const keyOf = (item: RecurringOccurrence) =>
-    `${item.recurringId}|${item.dueDate}`;
+  const activeCategories = useMemo(
+    () => categories.filter((category) => !category.archived),
+    [categories],
+  );
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    api
-      .monthOccurrences(month)
-      .then((next) => {
-        if (alive) setItems(next);
+    Promise.all([api.monthlyConcepts(month), api.plannedPayments(month)])
+      .then(([nextItems, nextPlanned]) => {
+        if (alive) {
+          setItems(nextItems);
+          setPlanned(nextPlanned);
+        }
       })
       .catch((cause) => {
         if (alive) show(cause instanceof Error ? cause.message : String(cause));
@@ -226,25 +282,10 @@ export function PendingScreen({
   }, [month, show, version]);
 
   useEffect(() => {
-    let alive = true;
-    api
-      .recurring()
-      .then((next) => {
-        if (alive) {
-          setTemplates(
-            next.filter(
-              (item) => item.active && item.frequency === "ondemand",
-            ),
-          );
-        }
-      })
-      .catch(() => {
-        // La lista mensual sigue funcionando aunque falle esta consulta.
-      });
-    return () => {
-      alive = false;
-    };
-  }, [version]);
+    if (!activeCategories.some((category) => category.id === newConceptId)) {
+      setNewConceptId(activeCategories[0]?.id ?? "");
+    }
+  }, [activeCategories, newConceptId]);
 
   const groups = useMemo(
     () => ({
@@ -257,55 +298,39 @@ export function PendingScreen({
   );
 
   const pendingTotal = groups.pending.reduce(
-    (sum, item) => sum + item.amountCents,
+    (sum, item) => sum + (item.lastAmountCents ?? 0),
     0,
   );
   const paidTotal = groups.paid.reduce(
-    (sum, item) => sum + (item.paidAmountCents ?? item.amountCents),
+    (sum, item) => sum + (item.paidAmountCents ?? 0),
     0,
   );
 
-  const templateDraft = (template: Recurring) =>
-    templateDrafts[template.id] ??
-    (template.amountCents / 100).toFixed(2).replace(".", ",");
+  const amountFor = (item: MonthlyConcept) =>
+    drafts[item.conceptId] ??
+    (item.lastAmountCents ? (item.lastAmountCents / 100).toFixed(2).replace(".", ",") : "");
+  const methodFor = (item: MonthlyConcept): "cash" | "qr" =>
+    methods[item.conceptId] ??
+    (item.lastMethod === "qr" ? "qr" : "cash");
 
-  const registerTemplate = async (template: Recurring) => {
-    const key = template.id;
-    const amount = parseAmountToCents(templateDraft(template));
-    const date = templateDates[key] ?? todayISO();
-    if (amount <= 0 || !date) return;
-    setTemplateBusy((current) => ({ ...current, [key]: true }));
-    try {
-      await api.registerOccurrence(
-        template.id,
-        date,
-        amount,
-        template.note,
-      );
-      await refresh();
-      show(`Registrado: ${template.name}`);
-    } catch (cause) {
-      show(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setTemplateBusy((current) => ({ ...current, [key]: false }));
-    }
-  };
-
-  const register = async (item: RecurringOccurrence) => {
-    const key = keyOf(item);
-    const draft =
-      drafts[key] ??
-      (item.amountCents / 100).toFixed(2).replace(".", ",");
-    const amount = parseAmountToCents(draft);
+  const register = async (item: MonthlyConcept) => {
+    const key = item.conceptId;
+    const amount = parseAmountToCents(amountFor(item));
     if (amount <= 0) return;
     setBusy((current) => ({ ...current, [key]: true }));
     try {
-      await api.registerOccurrence(
-        item.recurringId,
-        item.dueDate,
-        amount,
-        item.note,
-      );
+      await api.saveTransaction({
+        id: null,
+        kind: item.kind,
+        amountCents: amount,
+        date: item.dueDate,
+        accountId: methodFor(item) === "cash" ? "acc-cash" : "acc-bank",
+        toAccountId: null,
+        categoryId: item.conceptId,
+        note: null,
+        recurringId: null,
+        paymentMethod: methodFor(item),
+      });
       await refresh();
       show(`Registrado: ${item.name}`);
     } catch (cause) {
@@ -315,13 +340,13 @@ export function PendingScreen({
     }
   };
 
-  const skip = async (item: RecurringOccurrence) => {
-    const key = keyOf(item);
+  const skip = async (item: MonthlyConcept) => {
+    const key = item.conceptId;
     setBusy((current) => ({ ...current, [key]: true }));
     try {
-      await api.skipOccurrence(item.recurringId, item.dueDate);
+      await api.skipConceptMonth(item.conceptId, month);
       await refresh();
-      show(`Saltado: ${item.name} de ${fmtDay(item.dueDate)}`);
+      show(`Saltado: ${item.name}`);
     } catch (cause) {
       show(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -329,129 +354,216 @@ export function PendingScreen({
     }
   };
 
-  const renderRow = (item: RecurringOccurrence) => {
-    const key = keyOf(item);
-    return (
-      <OccurrenceRow
-        key={key}
-        item={item}
-        draft={
-          drafts[key] ??
-          (item.amountCents / 100).toFixed(2).replace(".", ",")
-        }
-        busy={Boolean(busy[key])}
-        onDraft={(value) =>
-          setDrafts((current) => ({ ...current, [key]: value }))
-        }
-        onRegister={() => void register(item)}
-        onSkip={() => void skip(item)}
-      />
-    );
+  const payPlanned = async (item: PlannedPayment) => {
+    setBusy((current) => ({ ...current, [item.id]: true }));
+    try {
+      await api.payPlannedPayment(
+        item.id,
+        item.amountCents,
+        item.method ?? "cash",
+        item.dueDate,
+      );
+      await refresh();
+      show(`Pagado: ${item.conceptName ?? "pendiente"}`);
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy((current) => ({ ...current, [item.id]: false }));
+    }
   };
+
+  const cancelPlanned = async (item: PlannedPayment) => {
+    setBusy((current) => ({ ...current, [item.id]: true }));
+    try {
+      await api.cancelPlannedPayment(item.id);
+      await refresh();
+      show("Pendiente cancelado");
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy((current) => ({ ...current, [item.id]: false }));
+    }
+  };
+
+  const createPlanned = async () => {
+    if (!newConceptId || !newDate) return;
+    setCreating(true);
+    try {
+      await api.createPlannedPayment({
+        conceptId: newConceptId,
+        amountCents: parseAmountToCents(newAmount) || null,
+        dueDate: newDate,
+        note: newNote.trim() || null,
+        reminderDays: Number(newReminder) || 1,
+        method: newMethod,
+      });
+      await refresh();
+      setShowPlannedForm(false);
+      setNewAmount("");
+      setNewNote("");
+      show("Pendiente agregado");
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const renderRow = (item: MonthlyConcept) => (
+    <ConceptRow
+      key={item.conceptId}
+      item={item}
+      amount={amountFor(item)}
+      method={methodFor(item)}
+      busy={Boolean(busy[item.conceptId])}
+      onAmount={(value) =>
+        setDrafts((current) => ({ ...current, [item.conceptId]: value }))
+      }
+      onMethod={(value) =>
+        setMethods((current) => ({ ...current, [item.conceptId]: value }))
+      }
+      onRegister={() => void register(item)}
+      onSkip={() => void skip(item)}
+    />
+  );
 
   return (
     <div className="notex-screen">
       <PageHeader
         title="Pendientes"
-        subtitle="Los pagos recurrentes del mes: pendientes, pagados y próximos."
+        subtitle="Pagos mensuales y pendientes puntuales, con sus recordatorios."
         actions={<MonthNav month={month} onChange={setMonth} />}
       />
 
-      {templates.length > 0 ? (
-        <Panel className="mb-4 overflow-hidden">
-          <div className="border-b border-line/70 px-5 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-serif text-[1.25rem] font-semibold leading-tight text-ink">
-                Cuando haga falta
-              </h2>
-              <span className="micro text-dim">{templates.length}</span>
-            </div>
-            <p className="mt-1 text-sm leading-relaxed text-muted">
-              No vencen. Registralos cuando los uses; pueden repetirse las
-              veces que necesites en el mes.
+      {reminders.length > 0 ? (
+        <div className="mb-4 flex items-center gap-3 rounded-panel border border-warning/30 bg-warning/[0.06] px-4 py-3">
+          <CalendarClock className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.75} />
+          <p className="text-sm text-ink">
+            {reminders.length === 1
+              ? `${reminders[0].name} vence ${reminders[0].daysLeft === 0 ? "hoy" : `en ${reminders[0].daysLeft} ${reminders[0].daysLeft === 1 ? "día" : "días"}`}`
+              : `${reminders.length} pagos están por vencer`}
+          </p>
+        </div>
+      ) : null}
+
+      <Panel className="mb-4 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-line/70 px-4 py-3 sm:px-5">
+          <div>
+            <Micro>Pendientes puntuales</Micro>
+            <p className="mt-1 text-sm text-muted">
+              Para una fecha concreta, con aviso el día anterior.
             </p>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowPlannedForm((value) => !value)}
+          >
+            + Agregar
+          </Button>
+        </div>
+
+        {showPlannedForm ? (
+          <div className="border-b border-line/70 bg-sunken/50 px-4 py-4 sm:px-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <Micro className="mb-1.5 block">¿Qué vas a pagar?</Micro>
+                <Select
+                  value={newConceptId}
+                  onChange={(event) => setNewConceptId(event.target.value)}
+                >
+                  {activeCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="block">
+                <Micro className="mb-1.5 block">Monto</Micro>
+                <TextInput
+                  value={newAmount}
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  onChange={(event) => setNewAmount(event.target.value)}
+                />
+              </label>
+              <label className="block">
+                <Micro className="mb-1.5 block">Fecha de pago</Micro>
+                <TextInput
+                  type="date"
+                  value={newDate}
+                  onChange={(event) => setNewDate(event.target.value)}
+                />
+              </label>
+              <label className="block">
+                <Micro className="mb-1.5 block">Avisar días antes</Micro>
+                <TextInput
+                  type="number"
+                  min={0}
+                  max={30}
+                  value={newReminder}
+                  onChange={(event) => setNewReminder(event.target.value)}
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <Micro className="mb-1.5 block">Medio</Micro>
+                <Segmented
+                  value={newMethod}
+                  onChange={setNewMethod}
+                  options={[
+                    { value: "cash", label: "Efectivo" },
+                    { value: "qr", label: "QR" },
+                  ]}
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <Micro className="mb-1.5 block">Nota (opcional)</Micro>
+                <TextInput
+                  value={newNote}
+                  placeholder="Ej. proveedor, factura, análisis"
+                  onChange={(event) => setNewNote(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void createPlanned()}
+                disabled={creating || !newConceptId || !newDate}
+              >
+                {creating ? "Guardando…" : "Agregar pendiente"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPlannedForm(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {planned.length === 0 && !showPlannedForm ? (
+          <p className="px-4 py-4 text-sm text-muted sm:px-5">
+            No hay pendientes puntuales para {monthLabelFromKey(month)}.
+          </p>
+        ) : (
           <div className="divide-y divide-line/70">
-            {templates.map((template) => (
-              <div key={template.id} className="px-4 py-4 sm:px-5">
-                <div className="flex items-start gap-3">
-                  <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-line"
-                    style={{
-                      backgroundColor: `${template.categoryColor ?? "#8d8d8d"}14`,
-                      color: template.categoryColor ?? "var(--color-muted)",
-                    }}
-                  >
-                    <CategoryIcon
-                      name={template.categoryIcon}
-                      className="h-4 w-4"
-                    />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] text-ink">
-                      {template.name}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-dim">
-                      {template.categoryName} · {template.accountName}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-dim">
-                      {template.lastUsed
-                        ? `Último: ${fmtDay(template.lastUsed)}`
-                        : "Sin registros todavía"}
-                    </p>
-                  </div>
-                  <Money
-                    cents={template.amountCents}
-                    symbol={false}
-                    className="shrink-0 font-mono text-sm text-muted"
-                  />
-                </div>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <label className="block sm:w-32">
-                    <Micro className="mb-1.5 block">Monto</Micro>
-                    <TextInput
-                      value={templateDraft(template)}
-                      inputMode="decimal"
-                      onChange={(event) =>
-                        setTemplateDrafts((current) => ({
-                          ...current,
-                          [template.id]: event.target.value,
-                        }))
-                      }
-                      aria-label={`Monto de ${template.name}`}
-                    />
-                  </label>
-                  <label className="block sm:w-40">
-                    <Micro className="mb-1.5 block">Fecha</Micro>
-                    <TextInput
-                      type="date"
-                      value={templateDates[template.id] ?? todayISO()}
-                      onChange={(event) =>
-                        setTemplateDates((current) => ({
-                          ...current,
-                          [template.id]: event.target.value,
-                        }))
-                      }
-                      aria-label={`Fecha de ${template.name}`}
-                    />
-                  </label>
-                  <Button
-                    variant="primary"
-                    onClick={() => void registerTemplate(template)}
-                    disabled={
-                      templateBusy[template.id] ||
-                      parseAmountToCents(templateDraft(template)) <= 0
-                    }
-                  >
-                    <Check className="h-4 w-4" strokeWidth={2.25} />
-                    Registrar
-                  </Button>
-                </div>
-              </div>
+            {planned.map((item) => (
+              <PlannedRow
+                key={item.id}
+                item={item}
+                busy={Boolean(busy[item.id])}
+                onPay={() => void payPlanned(item)}
+                onCancel={() => void cancelPlanned(item)}
+              />
             ))}
           </div>
-        </Panel>
-      ) : null}
+        )}
+      </Panel>
 
       <div className="mb-4 grid grid-cols-3 divide-x divide-line rounded-panel border border-line bg-panel">
         <div className="px-4 py-3">
@@ -462,8 +574,7 @@ export function PendingScreen({
             className="mt-1 block font-mono text-[0.95rem]"
           />
           <span className="mt-0.5 block text-[11px] text-dim">
-            {groups.pending.length}{" "}
-            {groups.pending.length === 1 ? "pago" : "pagos"}
+            {groups.pending.length} pagos
           </span>
         </div>
         <div className="px-4 py-3">
@@ -474,8 +585,7 @@ export function PendingScreen({
             className="mt-1 block font-mono text-[0.95rem] text-positive"
           />
           <span className="mt-0.5 block text-[11px] text-dim">
-            {groups.paid.length}{" "}
-            {groups.paid.length === 1 ? "pago" : "pagos"}
+            {groups.paid.length} pagos
           </span>
         </div>
         <div className="px-4 py-3">
@@ -483,58 +593,67 @@ export function PendingScreen({
           <span className="mt-1 block font-mono text-[0.95rem] text-muted">
             {groups.skipped.length}
           </span>
-          <span className="mt-0.5 block text-[11px] text-dim">
-            este mes
-          </span>
+          <span className="mt-0.5 block text-[11px] text-dim">este mes</span>
         </div>
-      </div>
-
-      <div className="mb-4 rounded-panel border border-line bg-panel px-4 py-3 text-sm leading-relaxed text-muted">
-        No se registran solos. Confirma el monto cuando los pagues; los que ya
-        pagaste quedan marcados como pagados este mes. Si un pago no
-        corresponde, sáltalo.
       </div>
 
       <Panel className="overflow-hidden">
         {loading ? (
           <div className="space-y-4 p-5">
             {[0, 1, 2].map((index) => (
-              <div
-                key={index}
-                className="h-14 animate-pulse rounded-lg bg-raised"
-              />
+              <div key={index} className="h-14 animate-pulse rounded-lg bg-raised" />
             ))}
           </div>
         ) : items.length === 0 ? (
           <EmptyState
             icon={<CalendarClock className="h-4 w-4" strokeWidth={1.75} />}
-            title={`No hay pagos recurrentes en ${monthLabelFromKey(month)}`}
-            description="Crea un recurrente y aparece acá cada mes para que lo confirmes."
+            title={`No hay pagos mensuales en ${monthLabelFromKey(month)}`}
+            description="Los conceptos con “se paga cada mes” aparecen acá."
             action={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigate("settings")}
-              >
-                Crear recurrente
+              <Button variant="outline" size="sm" onClick={() => onNavigate("settings")}>
+                Administrar conceptos
                 <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
               </Button>
             }
           />
         ) : (
           <div>
-            <Group title="Por confirmar" items={groups.pending}>
-              {groups.pending.map(renderRow)}
-            </Group>
-            <Group title="Próximos" items={groups.upcoming}>
-              {groups.upcoming.map(renderRow)}
-            </Group>
-            <Group title="Pagados" items={groups.paid}>
-              {groups.paid.map(renderRow)}
-            </Group>
-            <Group title="Saltados" items={groups.skipped}>
-              {groups.skipped.map(renderRow)}
-            </Group>
+            {groups.pending.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-2 first:border-t-0">
+                  <Micro>Por confirmar</Micro>
+                  <span className="num text-xs text-dim">{groups.pending.length}</span>
+                </div>
+                <div className="divide-y divide-line/70">{groups.pending.map(renderRow)}</div>
+              </div>
+            ) : null}
+            {groups.upcoming.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-2">
+                  <Micro>Próximos</Micro>
+                  <span className="num text-xs text-dim">{groups.upcoming.length}</span>
+                </div>
+                <div className="divide-y divide-line/70">{groups.upcoming.map(renderRow)}</div>
+              </div>
+            ) : null}
+            {groups.paid.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-2">
+                  <Micro>Pagados</Micro>
+                  <span className="num text-xs text-dim">{groups.paid.length}</span>
+                </div>
+                <div className="divide-y divide-line/70">{groups.paid.map(renderRow)}</div>
+              </div>
+            ) : null}
+            {groups.skipped.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-2">
+                  <Micro>Saltados</Micro>
+                  <span className="num text-xs text-dim">{groups.skipped.length}</span>
+                </div>
+                <div className="divide-y divide-line/70">{groups.skipped.map(renderRow)}</div>
+              </div>
+            ) : null}
           </div>
         )}
       </Panel>

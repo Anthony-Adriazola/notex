@@ -174,14 +174,18 @@ fn upsert_account(conn: &Connection, row: &Account) -> Result<(), String> {
 fn upsert_category(conn: &Connection, row: &Category) -> Result<(), String> {
     conn.execute(
         "INSERT INTO categories
-         (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, deleted_at, device_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+         (id, name, kind, color, icon, budget_cents, monthly, due_day, reminder_days,
+          archived, created_at, updated_at, deleted_at, device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(id) DO UPDATE SET
              name = excluded.name,
              kind = excluded.kind,
              color = excluded.color,
              icon = excluded.icon,
              budget_cents = excluded.budget_cents,
+             monthly = excluded.monthly,
+             due_day = excluded.due_day,
+             reminder_days = excluded.reminder_days,
              archived = excluded.archived,
              updated_at = excluded.updated_at,
              deleted_at = excluded.deleted_at,
@@ -193,6 +197,9 @@ fn upsert_category(conn: &Connection, row: &Category) -> Result<(), String> {
             row.color,
             row.icon,
             row.budget_cents,
+            row.monthly as i64,
+            row.due_day,
+            row.reminder_days,
             row.archived as i64,
             row.created_at,
             row.updated_at,
@@ -208,8 +215,8 @@ fn upsert_transaction(conn: &Connection, row: &Transaction) -> Result<(), String
     conn.execute(
         "INSERT INTO transactions
          (id, kind, amount_cents, date, account_id, to_account_id, category_id, note,
-          recurring_id, created_at, updated_at, deleted_at, device_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+          recurring_id, created_at, updated_at, payment_method, deleted_at, device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?14, ?12, ?13)
          ON CONFLICT(id) DO UPDATE SET
              kind = excluded.kind,
              amount_cents = excluded.amount_cents,
@@ -220,6 +227,7 @@ fn upsert_transaction(conn: &Connection, row: &Transaction) -> Result<(), String
              note = excluded.note,
              recurring_id = excluded.recurring_id,
              updated_at = excluded.updated_at,
+             payment_method = excluded.payment_method,
              deleted_at = excluded.deleted_at,
              device_id = excluded.device_id",
         params![
@@ -234,6 +242,7 @@ fn upsert_transaction(conn: &Connection, row: &Transaction) -> Result<(), String
             row.recurring_id,
             row.created_at,
             row.updated_at,
+            row.payment_method,
             row.deleted_at,
             row.device_id
         ],
@@ -297,6 +306,44 @@ fn upsert_budget(conn: &Connection, row: &Budget) -> Result<(), String> {
             row.category_id,
             row.month,
             row.amount_cents,
+            row.created_at,
+            row.updated_at,
+            row.deleted_at,
+            row.device_id
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn upsert_planned(conn: &Connection, row: &PlannedPayment) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO planned_payments
+         (id, concept_id, amount_cents, due_date, note, reminder_days, status, method,
+          transaction_id, created_at, updated_at, deleted_at, device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+         ON CONFLICT(id) DO UPDATE SET
+             concept_id = excluded.concept_id,
+             amount_cents = excluded.amount_cents,
+             due_date = excluded.due_date,
+             note = excluded.note,
+             reminder_days = excluded.reminder_days,
+             status = excluded.status,
+             method = excluded.method,
+             transaction_id = excluded.transaction_id,
+             updated_at = excluded.updated_at,
+             deleted_at = excluded.deleted_at,
+             device_id = excluded.device_id",
+        params![
+            row.id,
+            row.concept_id,
+            row.amount_cents,
+            row.due_date,
+            row.note,
+            row.reminder_days,
+            row.status,
+            row.method,
+            row.transaction_id,
             row.created_at,
             row.updated_at,
             row.deleted_at,
@@ -375,6 +422,32 @@ pub fn apply_change(
                 return Ok(false);
             }
             upsert_budget(conn, &row)?;
+            true
+        }
+        "planned_payment" => {
+            let row: PlannedPayment =
+                serde_json::from_str(&change.payload).map_err(|e| e.to_string())?;
+            if !should_apply(conn, "planned_payments", &row.id, &row.updated_at, &row.device_id)? {
+                return Ok(false);
+            }
+            upsert_planned(conn, &row)?;
+            true
+        }
+        "concept_skip" => {
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct ConceptSkip {
+                concept_id: String,
+                month: String,
+            }
+            let row: ConceptSkip =
+                serde_json::from_str(&change.payload).map_err(|e| e.to_string())?;
+            conn.execute(
+                "INSERT OR REPLACE INTO concept_skips (concept_id, month, created_at)
+                 VALUES (?1, ?2, ?3)",
+                params![row.concept_id, row.month, Utc::now().to_rfc3339()],
+            )
+            .map_err(|e| e.to_string())?;
             true
         }
         "recurring_skip" => {

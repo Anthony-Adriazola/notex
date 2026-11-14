@@ -434,6 +434,152 @@ pub fn app_info(state: State<'_, AppState>) -> Result<serde_json::Value, String>
     }))
 }
 
+
+#[tauri::command]
+pub fn update_concept(
+    state: State<'_, AppState>,
+    id: String,
+    input: CategoryInput,
+) -> Result<Category, String> {
+    let conn = lock(&state)?;
+    let category = db::update_concept(&conn, &id, &input, &state.device_id)?;
+    log_entity(
+        &conn,
+        "category",
+        &category.id,
+        &category.updated_at,
+        &state.device_id,
+        &category,
+    )?;
+    Ok(category)
+}
+
+#[tauri::command]
+pub fn monthly_concepts(
+    state: State<'_, AppState>,
+    month: String,
+) -> Result<Vec<MonthlyConcept>, String> {
+    parse_month(&month)?;
+    let conn = lock(&state)?;
+    db::monthly_concepts(&conn, &month, db::today()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn planned_payments(
+    state: State<'_, AppState>,
+    month: String,
+) -> Result<Vec<PlannedPayment>, String> {
+    parse_month(&month)?;
+    let conn = lock(&state)?;
+    db::list_planned_payments(&conn, &month).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_planned_payment(
+    state: State<'_, AppState>,
+    input: PlannedPaymentInput,
+) -> Result<PlannedPayment, String> {
+    let conn = lock(&state)?;
+    let planned = db::create_planned_payment(&conn, &input, &state.device_id)?;
+    log_entity(
+        &conn,
+        "planned_payment",
+        &planned.id,
+        &planned.updated_at,
+        &state.device_id,
+        &planned,
+    )?;
+    Ok(planned)
+}
+
+#[tauri::command]
+pub fn pay_planned_payment(
+    state: State<'_, AppState>,
+    id: String,
+    amount_cents: i64,
+    method: String,
+    date: String,
+) -> Result<Transaction, String> {
+    let conn = lock(&state)?;
+    let tx = db::pay_planned_payment(
+        &conn,
+        &id,
+        amount_cents,
+        &method,
+        &date,
+        &state.device_id,
+    )?;
+    log_entity(
+        &conn,
+        "transaction",
+        &tx.id,
+        &tx.updated_at,
+        &state.device_id,
+        &tx,
+    )?;
+    if let Ok(planned) = db::get_planned_payment(&conn, &id) {
+        log_entity(
+            &conn,
+            "planned_payment",
+            &planned.id,
+            &planned.updated_at,
+            &state.device_id,
+            &planned,
+        )?;
+    }
+    Ok(tx)
+}
+
+#[tauri::command]
+pub fn cancel_planned_payment(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let conn = lock(&state)?;
+    let mut planned = db::get_planned_payment(&conn, &id).map_err(|e| e.to_string())?;
+    db::cancel_planned_payment(&conn, &id, &state.device_id)?;
+    planned.status = "cancelled".into();
+    planned.deleted_at = Some(db::now_iso());
+    planned.updated_at = planned.deleted_at.clone().unwrap_or_default();
+    log_entity(
+        &conn,
+        "planned_payment",
+        &planned.id,
+        &planned.updated_at,
+        &state.device_id,
+        &planned,
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn skip_concept_month(
+    state: State<'_, AppState>,
+    concept_id: String,
+    month: String,
+) -> Result<(), String> {
+    let conn = lock(&state)?;
+    db::skip_concept_month(&conn, &concept_id, &month).map_err(|e| e.to_string())?;
+    let payload = serde_json::json!({ "conceptId": concept_id, "month": month }).to_string();
+    sync_store::log_change(
+        &conn,
+        "concept_skip",
+        &format!("{concept_id}:{month}"),
+        "upsert",
+        &db::now_iso(),
+        &state.device_id,
+        &payload,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reminders(state: State<'_, AppState>) -> Result<Vec<ReminderItem>, String> {
+    let conn = lock(&state)?;
+    db::reminders(&conn, db::today()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn sync_status(state: State<'_, AppState>) -> Result<SyncStatus, String> {
     let conn = lock(&state)?;

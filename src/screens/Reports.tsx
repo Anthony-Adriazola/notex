@@ -150,7 +150,7 @@ export function ReportsScreen() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
         <Panel className="p-5">
-          <Micro>Categorías de este mes</Micro>
+          <Micro>Conceptos de este mes</Micro>
           {categories.length === 0 ? (
             <p className="mt-4 text-sm text-muted">
               Todavía no hay gastos este mes.
@@ -184,26 +184,34 @@ export function ReportsScreen() {
         </Panel>
 
         <Panel className="p-5">
-          <Micro>Saldo por cuenta</Micro>
+          <Micro>Por medio de pago</Micro>
           <div className="mt-4 flex flex-col divide-y divide-line/70">
-            {data.accounts.map((account) => (
-              <div
-                key={account.id}
-                className="flex items-center justify-between gap-3 py-2.5"
-              >
-                <div>
-                  <p className="text-sm text-ink">{account.name}</p>
-                  <p className="mt-0.5 font-mono text-[0.625rem] uppercase tracking-[0.1em] text-dim">
-                    {account.kind === "cash" ? "Efectivo" : "Banco"}
+            {[
+              ["cash", "Efectivo"],
+              ["qr", "QR"],
+            ].map(([method, label]) => {
+              const row = data.methods.find((item) => item.method === method);
+              return (
+                <div key={method} className="py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-ink">{label}</p>
+                    <Money
+                      cents={row?.incomeCents ?? 0}
+                      symbol={false}
+                      className="font-mono text-sm text-positive"
+                    />
+                  </div>
+                  <p className="mt-0.5 text-xs text-dim">
+                    Ingresos del mes · gastos{" "}
+                    <Money
+                      cents={row?.expenseCents ?? 0}
+                      symbol={false}
+                      className="text-muted"
+                    />
                   </p>
                 </div>
-                <Money
-                  cents={account.balanceCents}
-                  symbol={false}
-                  className="font-mono text-sm"
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Panel>
       </div>

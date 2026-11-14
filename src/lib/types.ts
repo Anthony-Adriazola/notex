@@ -28,6 +28,13 @@ export interface Category {
   color: string;
   icon: string;
   budgetCents: number | null;
+  monthly: boolean;
+  dueDay: number | null;
+  reminderDays: number;
+  usageCount: number;
+  lastUsed: string | null;
+  lastAmountCents: number | null;
+  lastMethod: string | null;
   archived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -52,6 +59,7 @@ export interface TransactionRow {
   categoryIcon: string | null;
   accountName: string | null;
   toAccountName: string | null;
+  paymentMethod: string | null;
 }
 
 export interface Transaction {
@@ -153,6 +161,7 @@ export interface Reports {
   months: MonthTotal[];
   categories: BudgetLine[];
   accounts: AccountBalance[];
+  methods: MethodTotal[];
 }
 
 export interface TransactionFilter {
@@ -176,6 +185,7 @@ export interface TransactionInput {
   categoryId?: string | null;
   note?: string | null;
   recurringId?: string | null;
+  paymentMethod?: string | null;
 }
 
 export interface AccountInput {
@@ -190,6 +200,9 @@ export interface CategoryInput {
   color: string;
   icon: string;
   budgetCents?: number | null;
+  monthly?: boolean;
+  dueDay?: number | null;
+  reminderDays?: number | null;
 }
 
 export interface RecurringInput {
@@ -251,4 +264,55 @@ export interface RecurringOccurrence {
   accountId: string;
   accountName: string;
   note: string;
+}
+
+export interface MonthlyConcept {
+  conceptId: string;
+  name: string;
+  kind: "expense" | "income";
+  color: string;
+  icon: string;
+  dueDate: string;
+  status: "pending" | "paid" | "skipped" | "upcoming";
+  paidAmountCents: number | null;
+  transactionId: string | null;
+  lastAmountCents: number | null;
+  lastMethod: string | null;
+  reminderDays: number;
+}
+
+export interface PlannedPayment {
+  id: string;
+  conceptId: string;
+  amountCents: number;
+  dueDate: string;
+  note: string;
+  reminderDays: number;
+  status: string;
+  transactionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  deviceId: string;
+  conceptName: string | null;
+  conceptColor: string | null;
+  conceptIcon: string | null;
+  method: string | null;
+}
+
+export interface ReminderItem {
+  kind: "concept" | "planned";
+  conceptId: string;
+  name: string;
+  dueDate: string;
+  daysLeft: number;
+  amountCents: number | null;
+  method: string | null;
+  reminderDays: number;
+}
+
+export interface MethodTotal {
+  method: string;
+  expenseCents: number;
+  incomeCents: number;
 }
