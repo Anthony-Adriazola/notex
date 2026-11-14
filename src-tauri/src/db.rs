@@ -1293,6 +1293,85 @@ mod tests {
     use crate::models::{OccurrenceInput, RecurringInput};
 
     #[test]
+    fn business_migration_keeps_existing_transactions() {
+        let dir = std::env::temp_dir().join(format!("notex-migrate-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("test.db");
+        let _ = std::fs::remove_file(&path);
+        let conn = open(&path).unwrap();
+        migrate(&conn).unwrap();
+        // Simula una base anterior a la migración: categoría personal y cuenta "Efectivo".
+        conn.execute(
+            "INSERT INTO categories
+             (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
+             VALUES ('cat-food', 'Alimentación', 'expense', '#d9a441', 'utensils', NULL, 0,
+                     '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 'seed')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO accounts
+             (id, name, kind, initial_balance_cents, archived, created_at, updated_at, device_id)
+             VALUES ('acc-cash', 'Efectivo', 'cash', 0, 0,
+                     '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 'seed')",
+            [],
+        )
+        .unwrap();
+        let tx = save_transaction(
+            &conn,
+            &crate::models::TransactionInput {
+                id: None,
+                kind: "expense".into(),
+                amount_cents: 1500,
+                date: "2026-11-10".into(),
+                account_id: "acc-cash".into(),
+                to_account_id: None,
+                category_id: Some("cat-food".into()),
+                note: Some("Prueba".into()),
+                recurring_id: None,
+            },
+            "test-device",
+        )
+        .unwrap();
+
+        assert!(upgrade_business_defaults(&conn).unwrap());
+        assert!(!upgrade_business_defaults(&conn).unwrap());
+
+        let food: i64 = conn
+            .query_row(
+                "SELECT archived FROM categories WHERE id = 'cat-food'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(food, 1);
+        let goods: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM categories WHERE id = 'cat-goods' AND archived = 0",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(goods, 1);
+        let cash: String = conn
+            .query_row("SELECT name FROM accounts WHERE id = 'acc-cash'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(cash, "Caja");
+        let kept: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM transactions WHERE id = ?1",
+                [&tx.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept, 1);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
     fn monthly_occurrences_track_paid_and_skipped() {
         let dir = std::env::temp_dir().join(format!("notex-month-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
