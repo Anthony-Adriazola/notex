@@ -161,22 +161,16 @@ DESIGN.md             Sistema visual
 
 ## CI
 
-El workflow que genera el instalador de Windows y el APK de Android vive en
-`docs/build-workflow.yml`. Para activarlo, copiarlo a
-`.github/workflows/build.yml` y subirlo con un token que tenga el scope
-`workflow`:
+El workflow está en `.github/workflows/build.yml` y ya está activo. Se puede
+ejecutar a mano desde **Actions → builds → Run workflow**, o al empujar un tag
+`v*`. Genera dos artefactos:
 
-```bash
-gh auth login --scopes workflow
-mkdir -p .github/workflows
-cp docs/build-workflow.yml .github/workflows/build.yml
-git add .github/workflows/build.yml
-git commit -m "ci: builds de Windows y Android"
-git push
-```
+- `notex-windows`: instalador NSIS para Windows.
+- `notex-android`: APK de depuración ARM64.
 
-El APK de depuración para ARM64 también se puede generar localmente; el
-instalador de Windows conviene generarlo en CI o en una máquina Windows.
+Los artefactos se descargan desde la página de la corrida. El APK de release
+firmado se genera localmente (ver arriba) porque usa el keystore que no está en
+el repo.
 
 ## Estado
 
