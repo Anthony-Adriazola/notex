@@ -29,8 +29,8 @@ A private, local-first expense tracker for a small trading business. Both device
 - Expenses are recorded when merchandise is bought, when a supplier is paid, or when an operating cost appears; usually on the phone, with review and budgeting on the laptop.
 - The laptop is a laptop: it is sometimes off, so sync is deferred, visible, and never blocks recording.
 - Income is recorded too (sales and collections), so the month's result is meaningful.
-- Typical expenses: purchase of merchandise, suppliers, freight and transport, fuel, shop rent, utilities, payroll and payroll taxes, taxes and fees, marketing, packaging and supplies, maintenance, bank fees, travel, other.
-- Recurring payments: shop rent, electricity, water, internet, payroll taxes. Amounts vary, so a recurring item is shown month by month with a pending/paid/skipped/upcoming status and allows editing the amount before posting.
+- Typical expenses: purchase of mineral, mineral assays ("análisis de ley"), suppliers, freight and transport, fuel, shop rent, utilities, payroll and payroll taxes, taxes and royalties, marketing, packaging and supplies, machinery maintenance, bank fees, travel, other.
+- Recurring payments have two shapes. Fixed-schedule items (shop rent, electricity, water, internet, payroll taxes) are shown month by month with a pending/paid/skipped/upcoming status. On-demand items (mineral assays, occasional freight) have no due date and live in a "when needed" list, where they can be registered as many times as required.
 - Cash ("Efectivo") and bank accounts are tracked separately; transfers between them are not expenses.
 - Weeks start on Monday. Dates are shown as dd/mm/aaaa. Currency is BOB, formatted as `Bs 1.234,56`.
 - Only one user: no shared budgets, no multiuser roles, no invitations.
@@ -43,8 +43,8 @@ Confirmed for the first release:
 - Dashboard totals for today, current week, current month and current year, plus previous-month comparison, daily average, budget remaining, category breakdown and recent movements.
 - Movements list with search, filters, edit and delete with undo.
 - Accounts: cash ("Efectivo") and bank only. Transfers between accounts. No credit cards, no digital wallets.
-- Business categories by default (merchandise, suppliers, freight, fuel, rent, utilities, payroll, taxes, marketing, packaging, maintenance, fees, travel, other) plus income categories (sales, collections, other income). Custom categories with color and icon.
-- Recurring templates shown month by month with pending, paid, skipped and upcoming states; amount editing and per-period skip.
+- Business categories by default (mineral purchase, mineral assays, suppliers, freight, fuel, rent, utilities, payroll, taxes and royalties, marketing, packaging, machinery maintenance, fees, travel, other) plus income categories (mineral sales, collections, other income). Custom categories with color and icon.
+- Recurring templates in two modes: fixed schedule (month by month, with pending/paid/skipped/upcoming states) and on-demand ("when needed", no due date, repeatable). Amount editing and per-period skip.
 - Monthly budgets per category, with 80% and 100% alerts.
 - Reports: last 12 months, category breakdown, account balances.
 - CSV export, automatic local backups.

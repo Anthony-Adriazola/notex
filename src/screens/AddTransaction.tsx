@@ -236,7 +236,7 @@ export function AddTransactionScreen({
           <TextInput
             value={note}
             maxLength={140}
-            placeholder="Ej. flete, compra de mercadería, recibo de luz"
+            placeholder="Ej. flete, análisis de ley, recibo de luz"
             onChange={(event) => setNote(event.target.value)}
           />
         </Field>

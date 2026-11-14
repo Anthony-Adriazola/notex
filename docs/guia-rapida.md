@@ -16,7 +16,7 @@ En el celular, abrir **Notex** como cualquier otra app.
 
 1. Tocar **Agregar** (el botón claro del centro, abajo).
 2. Escribir el monto con el teclado. Por ejemplo, `25,50`.
-3. Elegir la categoría (Compra de mercadería, Proveedores, Fletes, Combustible, etc.).
+3. Elegir la categoría (Compra de mineral, Análisis de ley, Proveedores, Fletes, Combustible, etc.).
 4. Revisar la cuenta y la fecha, que ya vienen elegidas.
 5. Tocar **Guardar gasto**.
 
@@ -36,17 +36,24 @@ La pantalla **Resumen** muestra:
 
 ## Pagos que se repiten
 
-En **Ajustes → Recurrentes** se pueden crear el alquiler del local, la luz, el
-internet, los sueldos o cualquier pago fijo. En **Pendientes** se ve el mes
-completo, con el estado de cada pago:
+Hay dos tipos de recurrente:
+
+**Con fecha fija:** el alquiler del local, la luz, el internet, los sueldos. Se
+crean con “Cada mes”, “Cada semana” o “Cada año”. En **Pendientes** se ve el mes
+completo con el estado de cada pago:
 
 - **Pendiente:** ya venció y falta confirmarlo.
 - **Pagado:** ya se registró este mes.
 - **Próximo:** todavía no vence, pero se puede pagar antes.
 - **Saltado:** este mes no correspondía.
 
-Se puede corregir el monto antes de registrar y elegir **Saltar** si no
-corresponde. Nunca se registra solo.
+**Cuando haga falta:** por ejemplo, el **análisis de ley del mineral**. No tiene
+una fecha fija y no vence: se crea con “Sin fecha fija (cuando haga falta)” y
+aparece en la sección **Cuando haga falta** de Pendientes. Ahí se registra tantas
+veces como se use, con el monto y la fecha reales.
+
+En los dos casos se puede corregir el monto antes de registrar. Nunca se
+registra solo.
 
 ## Presupuestos
 

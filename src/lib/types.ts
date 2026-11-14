@@ -119,7 +119,7 @@ export interface Recurring {
   amountCents: number;
   accountId: string;
   categoryId: string;
-  frequency: "weekly" | "biweekly" | "monthly" | "yearly";
+  frequency: "weekly" | "biweekly" | "monthly" | "yearly" | "ondemand";
   startDate: string;
   note: string;
   active: boolean;
@@ -131,6 +131,7 @@ export interface Recurring {
   categoryColor: string | null;
   categoryIcon: string | null;
   accountName: string | null;
+  lastUsed: string | null;
 }
 
 export interface Occurrence {

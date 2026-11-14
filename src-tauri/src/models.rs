@@ -111,6 +111,8 @@ pub struct Recurring {
     pub category_color: Option<String>,
     pub category_icon: Option<String>,
     pub account_name: Option<String>,
+    #[serde(default)]
+    pub last_used: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

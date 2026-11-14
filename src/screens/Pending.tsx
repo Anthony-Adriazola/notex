@@ -9,11 +9,13 @@ import {
   monthLabelFromKey,
   monthShort,
   parseAmountToCents,
+  todayISO,
 } from "../lib/format";
 import { useStore } from "../lib/store";
 import { useToast } from "../components/Toast";
 import type {
   OccurrenceStatus,
+  Recurring,
   RecurringOccurrence,
   Route,
 } from "../lib/types";
@@ -190,6 +192,16 @@ export function PendingScreen({
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [templates, setTemplates] = useState<Recurring[]>([]);
+  const [templateDrafts, setTemplateDrafts] = useState<Record<string, string>>(
+    {},
+  );
+  const [templateDates, setTemplateDates] = useState<Record<string, string>>(
+    {},
+  );
+  const [templateBusy, setTemplateBusy] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const keyOf = (item: RecurringOccurrence) =>
     `${item.recurringId}|${item.dueDate}`;
@@ -213,6 +225,27 @@ export function PendingScreen({
     };
   }, [month, show, version]);
 
+  useEffect(() => {
+    let alive = true;
+    api
+      .recurring()
+      .then((next) => {
+        if (alive) {
+          setTemplates(
+            next.filter(
+              (item) => item.active && item.frequency === "ondemand",
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        // La lista mensual sigue funcionando aunque falle esta consulta.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [version]);
+
   const groups = useMemo(
     () => ({
       pending: items.filter((item) => item.status === "pending"),
@@ -231,6 +264,32 @@ export function PendingScreen({
     (sum, item) => sum + (item.paidAmountCents ?? item.amountCents),
     0,
   );
+
+  const templateDraft = (template: Recurring) =>
+    templateDrafts[template.id] ??
+    (template.amountCents / 100).toFixed(2).replace(".", ",");
+
+  const registerTemplate = async (template: Recurring) => {
+    const key = template.id;
+    const amount = parseAmountToCents(templateDraft(template));
+    const date = templateDates[key] ?? todayISO();
+    if (amount <= 0 || !date) return;
+    setTemplateBusy((current) => ({ ...current, [key]: true }));
+    try {
+      await api.registerOccurrence(
+        template.id,
+        date,
+        amount,
+        template.note,
+      );
+      await refresh();
+      show(`Registrado: ${template.name}`);
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setTemplateBusy((current) => ({ ...current, [key]: false }));
+    }
+  };
 
   const register = async (item: RecurringOccurrence) => {
     const key = keyOf(item);
@@ -297,6 +356,102 @@ export function PendingScreen({
         subtitle="Los pagos recurrentes del mes: pendientes, pagados y próximos."
         actions={<MonthNav month={month} onChange={setMonth} />}
       />
+
+      {templates.length > 0 ? (
+        <Panel className="mb-4 overflow-hidden">
+          <div className="border-b border-line/70 px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-serif text-[1.25rem] font-semibold leading-tight text-ink">
+                Cuando haga falta
+              </h2>
+              <span className="micro text-dim">{templates.length}</span>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-muted">
+              No vencen. Registralos cuando los uses; pueden repetirse las
+              veces que necesites en el mes.
+            </p>
+          </div>
+          <div className="divide-y divide-line/70">
+            {templates.map((template) => (
+              <div key={template.id} className="px-4 py-4 sm:px-5">
+                <div className="flex items-start gap-3">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-line"
+                    style={{
+                      backgroundColor: `${template.categoryColor ?? "#8d8d8d"}14`,
+                      color: template.categoryColor ?? "var(--color-muted)",
+                    }}
+                  >
+                    <CategoryIcon
+                      name={template.categoryIcon}
+                      className="h-4 w-4"
+                    />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] text-ink">
+                      {template.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-dim">
+                      {template.categoryName} · {template.accountName}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-dim">
+                      {template.lastUsed
+                        ? `Último: ${fmtDay(template.lastUsed)}`
+                        : "Sin registros todavía"}
+                    </p>
+                  </div>
+                  <Money
+                    cents={template.amountCents}
+                    symbol={false}
+                    className="shrink-0 font-mono text-sm text-muted"
+                  />
+                </div>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <label className="block sm:w-32">
+                    <Micro className="mb-1.5 block">Monto</Micro>
+                    <TextInput
+                      value={templateDraft(template)}
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setTemplateDrafts((current) => ({
+                          ...current,
+                          [template.id]: event.target.value,
+                        }))
+                      }
+                      aria-label={`Monto de ${template.name}`}
+                    />
+                  </label>
+                  <label className="block sm:w-40">
+                    <Micro className="mb-1.5 block">Fecha</Micro>
+                    <TextInput
+                      type="date"
+                      value={templateDates[template.id] ?? todayISO()}
+                      onChange={(event) =>
+                        setTemplateDates((current) => ({
+                          ...current,
+                          [template.id]: event.target.value,
+                        }))
+                      }
+                      aria-label={`Fecha de ${template.name}`}
+                    />
+                  </label>
+                  <Button
+                    variant="primary"
+                    onClick={() => void registerTemplate(template)}
+                    disabled={
+                      templateBusy[template.id] ||
+                      parseAmountToCents(templateDraft(template)) <= 0
+                    }
+                  >
+                    <Check className="h-4 w-4" strokeWidth={2.25} />
+                    Registrar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
 
       <div className="mb-4 grid grid-cols-3 divide-x divide-line rounded-panel border border-line bg-panel">
         <div className="px-4 py-3">

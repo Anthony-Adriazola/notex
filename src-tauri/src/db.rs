@@ -10,22 +10,23 @@ use crate::models::*;
 const SEED_TIME: &str = "2026-01-01T00:00:00Z";
 const SEED_DEVICE: &str = "seed";
 
-const BUSINESS_CATEGORIES: [(&str, &str, &str, &str, &str); 17] = [
-    ("cat-goods", "Compra de mercadería", "expense", "#d9a441", "package"),
+const BUSINESS_CATEGORIES: [(&str, &str, &str, &str, &str); 18] = [
+    ("cat-goods", "Compra de mineral", "expense", "#d9a441", "gem"),
+    ("cat-assay", "Análisis de ley", "expense", "#c99ab0", "flask-conical"),
     ("cat-suppliers", "Proveedores", "expense", "#c2a184", "handshake"),
     ("cat-freight", "Fletes y transporte", "expense", "#8aa9c9", "truck"),
     ("cat-fuel", "Combustible", "expense", "#d98a7d", "fuel"),
     ("cat-rent", "Alquiler del local", "expense", "#b08d6a", "store"),
     ("cat-utilities", "Servicios", "expense", "#d9c27a", "zap"),
     ("cat-payroll", "Sueldos y cargas", "expense", "#a99bc9", "users"),
-    ("cat-taxes", "Impuestos y tasas", "expense", "#9db8d6", "landmark"),
+    ("cat-taxes", "Impuestos y regalías", "expense", "#9db8d6", "landmark"),
     ("cat-marketing", "Publicidad", "expense", "#c99ab0", "megaphone"),
     ("cat-packaging", "Empaques e insumos", "expense", "#8fb996", "package-open"),
-    ("cat-maintenance", "Mantenimiento", "expense", "#9a968f", "wrench"),
+    ("cat-maintenance", "Maquinaria y mantenimiento", "expense", "#9a968f", "wrench"),
     ("cat-fees", "Comisiones y bancos", "expense", "#b8a27a", "percent"),
     ("cat-travel", "Viáticos", "expense", "#8aa9c9", "plane"),
     ("cat-other", "Otros gastos", "expense", "#9a968f", "circle-ellipsis"),
-    ("cat-sales", "Ventas", "income", "#8fb996", "shopping-bag"),
+    ("cat-sales", "Ventas de mineral", "income", "#8fb996", "shopping-bag"),
     ("cat-collections", "Cobranzas", "income", "#8aa9c9", "hand-coins"),
     ("cat-other-income", "Otros ingresos", "income", "#9db8d6", "plus-circle"),
 ];
@@ -171,6 +172,41 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
             "#,
         )?;
     }
+    if version < 2 {
+        conn.execute_batch(
+            r#"
+            PRAGMA foreign_keys = OFF;
+            BEGIN;
+            ALTER TABLE recurring RENAME TO recurring_v1;
+            CREATE TABLE recurring (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                kind        TEXT NOT NULL CHECK (kind IN ('expense','income')),
+                amount_cents INTEGER NOT NULL,
+                account_id  TEXT NOT NULL,
+                category_id TEXT NOT NULL,
+                frequency   TEXT NOT NULL CHECK (frequency IN ('weekly','biweekly','monthly','yearly','ondemand')),
+                start_date  TEXT NOT NULL,
+                note        TEXT NOT NULL DEFAULT '',
+                active      INTEGER NOT NULL DEFAULT 1,
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL,
+                deleted_at  TEXT,
+                device_id   TEXT NOT NULL
+            );
+            INSERT INTO recurring
+                (id, name, kind, amount_cents, account_id, category_id, frequency, start_date,
+                 note, active, created_at, updated_at, deleted_at, device_id)
+            SELECT id, name, kind, amount_cents, account_id, category_id, frequency, start_date,
+                   note, active, created_at, updated_at, deleted_at, device_id
+            FROM recurring_v1;
+            DROP TABLE recurring_v1;
+            COMMIT;
+            PRAGMA foreign_keys = ON;
+            PRAGMA user_version = 2;
+            "#,
+        )?;
+    }
     Ok(())
 }
 
@@ -240,27 +276,56 @@ pub fn ensure_account_label(conn: &Connection) -> rusqlite::Result<()> {
 }
 
 pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
-    if get_setting(conn, "business_defaults_v1")?.is_some() {
-        return Ok(false);
-    }
+    let mut changed = false;
     let now = now_iso();
-    for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
-        conn.execute(
-            "INSERT OR IGNORE INTO categories
-             (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, ?6, ?6, ?7)",
-            params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
-        )?;
+
+    if get_setting(conn, "business_defaults_v1")?.is_none() {
+        for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
+            conn.execute(
+                "INSERT OR IGNORE INTO categories
+                 (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, ?6, ?6, ?7)",
+                params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
+            )?;
+        }
+        for id in OLD_PERSONAL_CATEGORIES {
+            conn.execute(
+                "UPDATE categories SET archived = 1, updated_at = ?1
+                 WHERE id = ?2 AND archived = 0",
+                params![&now, id],
+            )?;
+        }
+        set_setting(conn, "business_defaults_v1", "1")?;
+        changed = true;
     }
-    for id in OLD_PERSONAL_CATEGORIES {
-        conn.execute(
-            "UPDATE categories SET archived = 1, updated_at = ?1
-             WHERE id = ?2 AND archived = 0",
-            params![&now, id],
-        )?;
+
+    if get_setting(conn, "business_defaults_v2")?.is_none() {
+        for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
+            conn.execute(
+                "INSERT OR IGNORE INTO categories
+                 (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, ?6, ?6, ?7)",
+                params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
+            )?;
+        }
+        let renames = [
+            ("cat-goods", "Compra de mercadería", "Compra de mineral", "gem"),
+            ("cat-taxes", "Impuestos y tasas", "Impuestos y regalías", "landmark"),
+            ("cat-sales", "Ventas", "Ventas de mineral", "shopping-bag"),
+            ("cat-maintenance", "Mantenimiento", "Maquinaria y mantenimiento", "wrench"),
+        ];
+        for (id, old_name, new_name, icon) in renames {
+            conn.execute(
+                "UPDATE categories SET name = ?1, icon = ?2, updated_at = ?3
+                 WHERE id = ?4 AND name = ?5",
+                params![new_name, icon, &now, id, old_name],
+            )?;
+        }
+        set_setting(conn, "business_defaults_v2", "1")?;
+        changed = true;
     }
-    set_setting(conn, "business_defaults_v1", "1")?;
-    Ok(true)
+
+    Ok(changed)
 }
 
 fn row_account_balance(row: &Row<'_>) -> rusqlite::Result<AccountBalance> {
@@ -885,13 +950,16 @@ fn row_recurring(row: &Row<'_>) -> rusqlite::Result<Recurring> {
         category_color: row.get(15)?,
         category_icon: row.get(16)?,
         account_name: row.get(17)?,
+        last_used: row.get(18)?,
     })
 }
 
 const RECURRING_SELECT: &str = r#"
     SELECT r.id, r.name, r.kind, r.amount_cents, r.account_id, r.category_id,
            r.frequency, r.start_date, r.note, r.active, r.created_at, r.updated_at,
-           r.deleted_at, r.device_id, c.name, c.color, c.icon, a.name
+           r.deleted_at, r.device_id, c.name, c.color, c.icon, a.name,
+           (SELECT MAX(t.date) FROM transactions t
+            WHERE t.recurring_id = r.id AND t.deleted_at IS NULL) AS last_used
     FROM recurring r
     LEFT JOIN categories c ON c.id = r.category_id
     LEFT JOIN accounts a ON a.id = r.account_id
@@ -920,7 +988,7 @@ pub fn create_recurring(
     }
     if !matches!(
         input.frequency.as_str(),
-        "weekly" | "biweekly" | "monthly" | "yearly"
+        "weekly" | "biweekly" | "monthly" | "yearly" | "ondemand"
     ) {
         return Err("Frecuencia inválida.".into());
     }
@@ -1003,7 +1071,10 @@ pub fn occurrences(conn: &Connection, today: NaiveDate) -> rusqlite::Result<Vec<
     let recurring = list_recurring(conn)?;
     let mut out = Vec::new();
 
-    for item in recurring.into_iter().filter(|r| r.active) {
+    for item in recurring
+        .into_iter()
+        .filter(|r| r.active && r.frequency != "ondemand")
+    {
         let Ok(start) = NaiveDate::parse_from_str(&item.start_date, "%Y-%m-%d") else {
             continue;
         };
@@ -1067,7 +1138,10 @@ pub fn month_occurrences(
     let recurring = list_recurring(conn)?;
     let mut out = Vec::new();
 
-    for item in recurring.into_iter().filter(|row| row.active) {
+    for item in recurring
+        .into_iter()
+        .filter(|row| row.active && row.frequency != "ondemand")
+    {
         let Ok(start) = NaiveDate::parse_from_str(&item.start_date, "%Y-%m-%d") else {
             continue;
         };
@@ -1147,8 +1221,9 @@ pub fn register_occurrence(
             row_recurring,
         )
         .map_err(|e| e.to_string())?;
-    if already_registered(conn, &input.recurring_id, &input.due_date)
-        .map_err(|e| e.to_string())?
+    if item.frequency != "ondemand"
+        && already_registered(conn, &input.recurring_id, &input.due_date)
+            .map_err(|e| e.to_string())?
     {
         return Err("Ese recurrente ya está registrado para esa fecha.".into());
     }
@@ -1295,6 +1370,71 @@ pub fn get_recurring(conn: &Connection, id: &str) -> rusqlite::Result<Recurring>
 mod tests {
     use super::*;
     use crate::models::{OccurrenceInput, RecurringInput};
+
+    #[test]
+    fn ondemand_recurring_allows_repeated_registrations() {
+        let dir = std::env::temp_dir().join(format!("notex-ondemand-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("test.db");
+        let _ = std::fs::remove_file(&path);
+        let conn = open(&path).unwrap();
+        migrate(&conn).unwrap();
+        seed(&conn).unwrap();
+        upgrade_business_defaults(&conn).unwrap();
+        let device = device_id(&conn).unwrap();
+
+        let recurring = create_recurring(
+            &conn,
+            &RecurringInput {
+                name: "Análisis de ley".into(),
+                kind: "expense".into(),
+                amount_cents: 45000,
+                account_id: "acc-bank".into(),
+                category_id: "cat-assay".into(),
+                frequency: "ondemand".into(),
+                start_date: "2026-11-14".into(),
+                note: Some("Cuando lo pidan".into()),
+            },
+            &device,
+        )
+        .unwrap();
+
+        // La migración de esquema v2 debe conservar el recurrente.
+        conn.execute_batch("PRAGMA user_version = 1;").unwrap();
+        migrate(&conn).unwrap();
+
+        let today = NaiveDate::from_ymd_opt(2026, 11, 14).unwrap();
+        assert!(month_occurrences(&conn, "2026-11", today).unwrap().is_empty());
+
+        for _ in 0..2 {
+            register_occurrence(
+                &conn,
+                &OccurrenceInput {
+                    recurring_id: recurring.id.clone(),
+                    due_date: "2026-11-14".into(),
+                    amount_cents: 45000,
+                    note: None,
+                },
+                &device,
+            )
+            .unwrap();
+        }
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM transactions WHERE recurring_id = ?1",
+                [&recurring.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+
+        let items = list_recurring(&conn).unwrap();
+        let item = items.iter().find(|row| row.id == recurring.id).unwrap();
+        assert_eq!(item.last_used.as_deref(), Some("2026-11-14"));
+
+        let _ = std::fs::remove_file(&path);
+    }
 
     #[test]
     fn business_migration_keeps_existing_transactions() {

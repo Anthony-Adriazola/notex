@@ -124,6 +124,8 @@ export function formatFrequency(frequency: string): string {
       return "Quincenal";
     case "yearly":
       return "Anual";
+    case "ondemand":
+      return "Sin fecha fija";
     default:
       return "Mensual";
   }

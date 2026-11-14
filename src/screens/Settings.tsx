@@ -445,15 +445,18 @@ function RecurringForm({
             <option value="weekly">Cada semana</option>
             <option value="biweekly">Cada quince días</option>
             <option value="yearly">Cada año</option>
+            <option value="ondemand">Sin fecha fija (cuando haga falta)</option>
           </Select>
         </Field>
-        <Field label="Primer vencimiento">
-          <TextInput
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-          />
-        </Field>
+        {frequency === "ondemand" ? null : (
+          <Field label="Primer vencimiento">
+            <TextInput
+              type="date"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </Field>
+        )}
         <Field label="Nota (opcional)" className="sm:col-span-2">
           <TextInput
             value={note}
@@ -1075,8 +1078,15 @@ export function SettingsScreen() {
                     <div className="min-w-0">
                       <p className="truncate text-[15px] text-ink">{item.name}</p>
                       <p className="mt-0.5 text-xs text-dim">
-                        {formatFrequency(item.frequency)} · próximo{" "}
-                        {fmtDay(nextOccurrence(item.startDate, item.frequency))}
+                        {item.frequency === "ondemand"
+                          ? `Sin fecha fija · ${
+                              item.lastUsed
+                                ? `último ${fmtDay(item.lastUsed)}`
+                                : "sin registros"
+                            }`
+                          : `${formatFrequency(item.frequency)} · próximo ${fmtDay(
+                              nextOccurrence(item.startDate, item.frequency),
+                            )}`}
                       </p>
                     </div>
                   </div>
