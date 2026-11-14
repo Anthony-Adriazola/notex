@@ -18,6 +18,7 @@ import {
 } from "../lib/icons";
 import { api } from "../lib/api";
 import {
+  fmtDay,
   fmtMoney,
   fmtRelative,
   fmtTime,
@@ -595,7 +596,7 @@ function SyncSection() {
                     key={address}
                     className="flex items-center gap-2 rounded-lg border border-line bg-sunken px-3 py-2"
                   >
-                    <code className="min-w-0 flex-1 truncate font-mono text-[0.6875rem] text-ink">
+                    <code className="min-w-0 flex-1 break-all font-mono text-[0.6875rem] text-ink">
                       {address}
                     </code>
                     <Button
@@ -927,7 +928,7 @@ export function SettingsScreen() {
               .map((category) => (
                 <div
                   key={category.id}
-                  className="flex items-center justify-between gap-4 px-5 py-3.5"
+                  className="flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <span
@@ -950,8 +951,8 @@ export function SettingsScreen() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <label className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-1 pl-11 sm:w-auto sm:pl-0">
+                    <label className="flex flex-1 items-center gap-2 sm:flex-none">
                       <span className="sr-only">
                         Presupuesto mensual de {category.name}
                       </span>
@@ -964,7 +965,7 @@ export function SettingsScreen() {
                         key={`${category.id}-${category.budgetCents ?? 0}`}
                         inputMode="decimal"
                         placeholder="0,00"
-                        className="h-9 w-24 text-right font-mono text-sm"
+                        className="h-9 w-full text-right font-mono text-sm sm:w-24"
                         onBlur={async (event) => {
                           const cents = parseAmountToCents(event.target.value);
                           if (cents === (category.budgetCents ?? 0)) return;
@@ -1032,7 +1033,7 @@ export function SettingsScreen() {
               {activeRecurring.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between gap-4 px-5 py-3.5"
+                  className="flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <span
@@ -1048,15 +1049,15 @@ export function SettingsScreen() {
                       <p className="truncate text-[15px] text-ink">{item.name}</p>
                       <p className="mt-0.5 text-xs text-dim">
                         {formatFrequency(item.frequency)} · próximo{" "}
-                        {nextOccurrence(item.startDate, item.frequency)}
+                        {fmtDay(nextOccurrence(item.startDate, item.frequency))}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 pl-11 sm:pl-0">
                     <Money
                       cents={item.amountCents}
                       symbol={false}
-                      className="font-mono text-sm"
+                      className="shrink-0 font-mono text-sm"
                     />
                     <IconButton
                       label={`Archivar ${item.name}`}

@@ -10,6 +10,7 @@ import {
 import { CategoryIcon } from "../lib/icons";
 import { api } from "../lib/api";
 import {
+  fmtCompact,
   fmtDay,
   fmtDayLong,
   fmtMoney,
@@ -77,7 +78,7 @@ function Stat({
       <Money
         cents={cents}
         className={cx(
-          "mt-1.5 block font-mono text-[1.05rem] leading-none",
+          "mt-1.5 block font-mono text-[clamp(0.92rem,4.2vw,1.05rem)] leading-none",
           tone === "positive" ? "text-positive" : "text-ink",
         )}
       />
@@ -116,7 +117,7 @@ function WeekBars({ data }: { data: Dashboard }) {
               {fmtWeekday(day.date)}
             </span>
             <span className="num text-[0.625rem] leading-none text-muted">
-              {day.cents > 0 ? fmtMoney(day.cents).replace("Bs ", "") : "—"}
+              {day.cents > 0 ? fmtCompact(day.cents) : "—"}
             </span>
           </div>
         );
@@ -160,8 +161,10 @@ function RecentRows({
                 {isTransfer
                   ? `${row.accountName ?? ""} → ${row.toAccountName ?? ""}`
                   : `${row.categoryName ?? "Sin categoría"} · ${row.accountName ?? ""}`}
-                {" · "}
-                {fmtDay(row.date)}
+                <span className="hidden min-[360px]:inline">
+                  {" · "}
+                  {fmtDay(row.date)}
+                </span>
               </p>
             </div>
             <Money
@@ -286,7 +289,7 @@ export function DashboardScreen({
             <div className="mt-3">
               <Money
                 cents={data.monthCents}
-                className="font-mono text-[2.5rem] leading-none tracking-[-0.035em] sm:text-[3.1rem]"
+                className="font-mono text-[clamp(1.75rem,8.5vw,3.1rem)] leading-none tracking-[-0.035em]"
               />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
@@ -299,7 +302,7 @@ export function DashboardScreen({
             </p>
 
             <div className="mt-6">
-              <div className="flex items-baseline justify-between gap-4">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
                 <span className="micro">Presupuesto del mes</span>
                 <span className="num text-xs text-muted">
                   {data.budgetTotalCents > 0

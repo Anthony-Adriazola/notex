@@ -1,6 +1,6 @@
 [package]
 name = "notex"
-version = "0.1.0"
+version = "0.1.1"
 description = "Gestor de gastos personales para Windows y Android"
 authors = ["Anthony Adriazola"]
 edition = "2024"

@@ -4,6 +4,7 @@ import { Target, X } from "lucide-react";
 import { CategoryIcon } from "../lib/icons";
 import { api } from "../lib/api";
 import {
+  fmtAmount,
   fmtMoney,
   monthKey,
   parseAmountToCents,
@@ -35,12 +36,12 @@ function BudgetRow({
 }) {
   const { show } = useToast();
   const [draft, setDraft] = useState(
-    line.budgetCents > 0 ? (line.budgetCents / 100).toFixed(2) : "",
+    line.budgetCents > 0 ? fmtAmount(line.budgetCents) : "",
   );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setDraft(line.budgetCents > 0 ? (line.budgetCents / 100).toFixed(2) : "");
+    setDraft(line.budgetCents > 0 ? fmtAmount(line.budgetCents) : "");
   }, [line.budgetCents, month]);
 
   const usage = pct(line.spentCents, line.budgetCents);
@@ -73,9 +74,10 @@ function BudgetRow({
 
   return (
     <div className="px-4 py-4 sm:px-5">
-      <div className="flex items-center gap-3">
-        <span
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line"
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex items-center gap-3">
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line"
           style={{
             backgroundColor: `${line.color}14`,
             color: line.color,
@@ -83,14 +85,15 @@ function BudgetRow({
         >
           <CategoryIcon name={line.icon} className="h-4 w-4" />
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm text-ink">{line.name}</p>
-          <p className="mt-0.5 text-xs text-dim">
-            {fmtMoney(line.spentCents)} gastados
-            {line.budgetCents > 0 ? ` de ${fmtMoney(line.budgetCents)}` : ""}
-          </p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-ink">{line.name}</p>
+            <p className="mt-0.5 text-xs text-dim">
+              {fmtMoney(line.spentCents)} gastados
+              {line.budgetCents > 0 ? ` de ${fmtMoney(line.budgetCents)}` : ""}
+            </p>
+          </div>
         </div>
-        <div className="flex w-32 items-center gap-1.5 sm:w-40">
+        <div className="flex w-full items-center gap-1.5 pl-11 sm:w-40 sm:pl-0">
           <TextInput
             value={draft}
             inputMode="decimal"

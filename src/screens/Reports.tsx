@@ -119,7 +119,7 @@ export function ReportsScreen() {
 
         <div className="mt-4 grid grid-cols-3 gap-4 border-t border-line pt-4">
           <div>
-            <Micro>Gastos 12 meses</Micro>
+            <Micro>Gastos</Micro>
             <Money
               cents={totalExpense}
               symbol={false}
@@ -127,7 +127,7 @@ export function ReportsScreen() {
             />
           </div>
           <div>
-            <Micro>Ingresos 12 meses</Micro>
+            <Micro>Ingresos</Micro>
             <Money
               cents={totalIncome}
               symbol={false}

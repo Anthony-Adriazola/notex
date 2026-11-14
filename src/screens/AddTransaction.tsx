@@ -335,7 +335,7 @@ export function AddTransactionScreen({
               <span className="font-mono text-sm text-muted">Bs</span>
               <span
                 className={cx(
-                  "num font-mono text-[2.6rem] leading-none tracking-[-0.04em] sm:text-[3.4rem]",
+                  "num font-mono text-[clamp(1.9rem,10vw,3.4rem)] leading-none tracking-[-0.04em]",
                   amountCents > 0 ? "text-ink" : "text-dim",
                 )}
               >

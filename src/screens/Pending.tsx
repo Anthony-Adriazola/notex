@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import {
   fmtDay,
   fmtMoney,
+  monthShort,
   parseAmountToCents,
 } from "../lib/format";
 import { useStore } from "../lib/store";
@@ -39,7 +40,7 @@ export function PendingScreen({
     for (const item of pending) {
       const key = keyOf(item.recurringId, item.dueDate);
       map[key] = parseAmountToCents(
-        drafts[key] ?? (item.amountCents / 100).toFixed(2),
+        drafts[key] ?? (item.amountCents / 100).toFixed(2).replace(".", ","),
       );
     }
     return map;
@@ -113,16 +114,17 @@ export function PendingScreen({
               const key = keyOf(item.recurringId, item.dueDate);
               const isBusy = busy[key];
               const draft =
-                drafts[key] ?? (item.amountCents / 100).toFixed(2);
+                drafts[key] ??
+                (item.amountCents / 100).toFixed(2).replace(".", ",");
               return (
                 <div key={key} className="flex flex-col gap-3 px-4 py-4 sm:px-5">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg border border-line bg-sunken">
+                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg border border-line bg-sunken">
                       <span className="num text-sm leading-none text-ink">
                         {item.dueDate.slice(8, 10)}
                       </span>
                       <span className="mt-0.5 font-mono text-[0.5625rem] uppercase text-dim">
-                        {fmtDay(item.dueDate).split(" ")[1]}
+                        {monthShort(item.dueDate)}
                       </span>
                     </div>
                     <div className="min-w-0 flex-1">

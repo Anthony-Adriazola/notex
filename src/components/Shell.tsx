@@ -259,12 +259,12 @@ export function Shell({
                   key={item.route}
                   onClick={() => onNavigate("add")}
                   aria-label="Agregar movimiento"
-                  className="flex h-[4.25rem] flex-col items-center justify-center"
+                  className="flex h-[4.5rem] w-full min-w-0 flex-col items-center justify-center"
                 >
                   <span className="flex h-11 w-11 -translate-y-0.5 items-center justify-center rounded-lg bg-ink text-canvas">
                     <Plus className="h-5 w-5" strokeWidth={2.25} />
                   </span>
-                  <span className="mt-0.5 font-mono text-[0.5625rem] uppercase tracking-[0.1em] text-muted">
+                  <span className="mt-0.5 w-full truncate px-0.5 text-center font-sans text-[clamp(0.5625rem,2.8vw,0.625rem)] font-semibold uppercase leading-none tracking-[0.01em] text-muted">
                     Agregar
                   </span>
                 </button>
@@ -276,12 +276,12 @@ export function Shell({
                 onClick={() => onNavigate(item.route)}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "relative flex h-[4.25rem] flex-col items-center justify-center gap-1 transition-colors",
+                  "relative flex h-[4.5rem] w-full min-w-0 flex-col items-center justify-center gap-1 transition-colors",
                   active ? "text-ink" : "text-dim",
                 )}
               >
                 <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={1.75} />
-                <span className="font-mono text-[0.5625rem] uppercase tracking-[0.1em]">
+                <span className="w-full truncate px-0.5 text-center font-sans text-[clamp(0.5625rem,2.8vw,0.625rem)] font-semibold uppercase leading-none tracking-[0.01em]">
                   {item.label}
                 </span>
                 {item.route === "pending" && pendingCount > 0 ? (

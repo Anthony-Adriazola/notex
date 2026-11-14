@@ -159,6 +159,12 @@ function advanceDate(date: Date, frequency: string): Date {
   return next;
 }
 
+export function monthShort(iso: string): string {
+  return new Intl.DateTimeFormat("es-BO", { month: "short" })
+    .format(parseISO(iso))
+    .replace(".", "");
+}
+
 export function fmtRelative(iso: string | null): string {
   if (!iso) return "nunca";
   const then = new Date(iso).getTime();
