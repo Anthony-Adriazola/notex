@@ -440,8 +440,18 @@ export function PendingScreen({
           <CalendarClock className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.75} />
           <p className="text-sm text-ink">
             {reminders.length === 1
-              ? `${reminders[0].name} vence ${reminders[0].daysLeft === 0 ? "hoy" : `en ${reminders[0].daysLeft} ${reminders[0].daysLeft === 1 ? "día" : "días"}`}`
-              : `${reminders.length} pagos están por vencer`}
+              ? `${reminders[0].name} ${
+                  reminders[0].daysLeft < 0
+                    ? `venció hace ${Math.abs(reminders[0].daysLeft)} ${
+                        Math.abs(reminders[0].daysLeft) === 1 ? "día" : "días"
+                      }`
+                    : reminders[0].daysLeft === 0
+                      ? "vence hoy"
+                      : `vence en ${reminders[0].daysLeft} ${
+                          reminders[0].daysLeft === 1 ? "día" : "días"
+                        }`
+                }`
+              : `${reminders.length} pagos necesitan atención`}
           </p>
         </div>
       ) : null}

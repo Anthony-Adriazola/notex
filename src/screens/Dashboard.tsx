@@ -270,14 +270,18 @@ export function DashboardScreen({
           <span className="min-w-0 flex-1">
             <span className="block text-sm text-ink">
               {reminders.length === 1
-                ? `${reminders[0].name} vence ${
-                    reminders[0].daysLeft === 0
-                      ? "hoy"
-                      : `en ${reminders[0].daysLeft} ${
-                          reminders[0].daysLeft === 1 ? "día" : "días"
+                ? `${reminders[0].name} ${
+                    reminders[0].daysLeft < 0
+                      ? `venció hace ${Math.abs(reminders[0].daysLeft)} ${
+                          Math.abs(reminders[0].daysLeft) === 1 ? "día" : "días"
                         }`
+                      : reminders[0].daysLeft === 0
+                        ? "vence hoy"
+                        : `vence en ${reminders[0].daysLeft} ${
+                            reminders[0].daysLeft === 1 ? "día" : "días"
+                          }`
                   }`
-                : `${reminders.length} pagos están por vencer`}
+                : `${reminders.length} pagos necesitan atención`}
             </span>
             <span className="mt-0.5 block text-xs text-muted">
               Revisá Pendientes para registrar el pago.

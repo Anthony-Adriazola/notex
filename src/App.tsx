@@ -50,10 +50,16 @@ function ReminderNotifier() {
       if (!granted || cancelled) return;
       const body = reminders
         .map((item) =>
-          `${item.name} vence ${
-            item.daysLeft === 0
-              ? "hoy"
-              : `en ${item.daysLeft} ${item.daysLeft === 1 ? "día" : "días"}`
+          `${item.name} ${
+            item.daysLeft < 0
+              ? `venció hace ${Math.abs(item.daysLeft)} ${
+                  Math.abs(item.daysLeft) === 1 ? "día" : "días"
+                }`
+              : item.daysLeft === 0
+                ? "vence hoy"
+                : `vence en ${item.daysLeft} ${
+                    item.daysLeft === 1 ? "día" : "días"
+                  }`
           }`,
         )
         .join(" · ");

@@ -128,7 +128,6 @@ export function MovementsScreen({
               ["all", "Todos"],
               ["expense", "Gastos"],
               ["income", "Ingresos"],
-              ["transfer", "Transferencias"],
             ] as Array<[KindFilter, string]>
           ).map(([value, label]) => (
             <button
