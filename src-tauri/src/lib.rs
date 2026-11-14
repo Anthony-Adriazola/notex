@@ -75,6 +75,35 @@ pub fn run() {
             db::migrate(&conn)?;
             db::seed(&conn)?;
             let device_id = db::device_id(&conn)?;
+            let migrated = db::upgrade_business_defaults(&conn)?;
+            if migrated {
+                for category in db::list_categories(&conn, None)? {
+                    let payload = serde_json::to_string(&category)?;
+                    sync_store::log_change(
+                        &conn,
+                        "category",
+                        &category.id,
+                        "upsert",
+                        &category.updated_at,
+                        &device_id,
+                        &payload,
+                    )?;
+                }
+                for id in ["acc-cash", "acc-bank"] {
+                    if let Ok(account) = db::get_account(&conn, id) {
+                        let payload = serde_json::to_string(&account)?;
+                        sync_store::log_change(
+                            &conn,
+                            "account",
+                            &account.id,
+                            "upsert",
+                            &account.updated_at,
+                            &device_id,
+                            &payload,
+                        )?;
+                    }
+                }
+            }
             sync::init_role(&conn)?;
             let conn = Arc::new(Mutex::new(conn));
 
@@ -113,6 +142,7 @@ pub fn run() {
             commands::create_recurring,
             commands::archive_recurring,
             commands::occurrences,
+            commands::month_occurrences,
             commands::register_occurrence,
             commands::skip_occurrence,
             commands::reports,

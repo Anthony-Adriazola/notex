@@ -12,6 +12,7 @@ import type {
   Occurrence,
   Recurring,
   RecurringInput,
+  RecurringOccurrence,
   Reports,
   Transaction,
   TransactionFilter,
@@ -70,6 +71,9 @@ export const api = {
     invoke<void>("archive_recurring", { id }),
 
   occurrences: () => invoke<Occurrence[]>("occurrences"),
+
+  monthOccurrences: (month: string) =>
+    invoke<RecurringOccurrence[]>("month_occurrences", { month }),
 
   registerOccurrence: (
     recurringId: string,

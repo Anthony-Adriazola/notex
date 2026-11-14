@@ -271,8 +271,8 @@ export function DashboardScreen({
           <span className="min-w-0 flex-1">
             <span className="block text-sm text-ink">
               {pending.length === 1
-                ? "Tienes un pago recurrente por confirmar"
-                : `Tienes ${pending.length} pagos recurrentes por confirmar`}
+                ? "Tienes un pago recurrente por confirmar este mes"
+                : `Tienes ${pending.length} pagos recurrentes por confirmar este mes`}
             </span>
             <span className="mt-0.5 block text-xs text-muted">
               Revísalos para que no se queden fuera del mes.
@@ -409,7 +409,7 @@ export function DashboardScreen({
           {categories.length === 0 ? (
             <EmptyState
               title="Todavía no hay gastos este mes"
-              description="Cuando anotes el primero, acá vas a ver en qué se te va la plata."
+              description="Cuando anotes el primero, vas a ver en qué se va el dinero de la empresa."
               action={
                 <Button size="sm" variant="outline" onClick={() => onNavigate("add")}>
                   Anotar un gasto

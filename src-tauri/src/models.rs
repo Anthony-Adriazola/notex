@@ -282,3 +282,23 @@ pub struct BackupInfo {
     pub path: String,
     pub exported_at: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecurringOccurrence {
+    pub recurring_id: String,
+    pub name: String,
+    pub kind: String,
+    pub amount_cents: i64,
+    pub due_date: String,
+    pub status: String,
+    pub paid_amount_cents: Option<i64>,
+    pub transaction_id: Option<String>,
+    pub category_id: String,
+    pub category_name: String,
+    pub category_color: String,
+    pub category_icon: String,
+    pub account_id: String,
+    pub account_name: String,
+    pub note: String,
+}

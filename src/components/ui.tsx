@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { fmtAmount, monthLabelFromKey, shiftMonth } from "../lib/format";
@@ -339,5 +340,38 @@ export function CategoryDot({ color, className }: { color?: string | null; class
       className={cx("inline-block h-2 w-2 shrink-0 rounded-full", className)}
       style={{ backgroundColor: color ?? "var(--color-dim)" }}
     />
+  );
+}
+
+export function ConfirmBar({
+  message,
+  confirmLabel = "Archivar",
+  busy = false,
+  onConfirm,
+  onCancel,
+}: {
+  message: string;
+  confirmLabel?: string;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return createPortal(
+    <div
+      role="alertdialog"
+      aria-live="assertive"
+      className="fixed inset-x-4 bottom-28 z-50 mx-auto max-w-md rounded-lg border border-line-strong bg-raised p-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)] lg:bottom-8"
+    >
+      <p className="text-sm leading-snug text-ink">{message}</p>
+      <div className="mt-3 flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
+          Cancelar
+        </Button>
+        <Button size="sm" variant="danger" onClick={onConfirm} disabled={busy}>
+          {busy ? "Archivando…" : confirmLabel}
+        </Button>
+      </div>
+    </div>,
+    document.body,
   );
 }

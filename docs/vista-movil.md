@@ -33,6 +33,10 @@ La versión interactiva está en `vista-movil.html` (abrir en un navegador).
 
 <img src="capturas/settings-360.png" width="340" alt="Ajustes">
 
+## Confirmación
+
+<img src="capturas/confirm-360.png" width="340" alt="Confirmación dentro de la app">
+
 ## Icono
 
 <img src="capturas/icono.png" width="64" alt="Icono de Notex">

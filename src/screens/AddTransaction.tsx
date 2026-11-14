@@ -83,7 +83,10 @@ export function AddTransactionScreen({
   const categoryKind: "expense" | "income" =
     kind === "income" ? "income" : "expense";
   const visibleCategories = useMemo(
-    () => categories.filter((category) => category.kind === categoryKind),
+    () =>
+      categories.filter(
+        (category) => category.kind === categoryKind && !category.archived,
+      ),
     [categories, categoryKind],
   );
 
@@ -280,7 +283,7 @@ export function AddTransactionScreen({
           <TextInput
             value={note}
             maxLength={140}
-            placeholder="Ej. almuerzo, taxi, recibo de luz"
+            placeholder="Ej. flete, compra de mercadería, recibo de luz"
             onChange={(event) => setNote(event.target.value)}
           />
         </Field>
@@ -373,7 +376,7 @@ export function AddTransactionScreen({
                       aria-pressed={selected}
                       onClick={() => setCategoryId(category.id)}
                       className={cx(
-                        "flex h-[4.25rem] flex-col items-start justify-between rounded-lg border p-2.5 text-left transition-colors",
+                        "flex min-h-[4.75rem] flex-col items-start justify-between rounded-lg border p-2.5 text-left transition-colors",
                         selected
                           ? "border-ink bg-raised"
                           : "border-line bg-panel hover:border-line-strong hover:bg-raised/70",
@@ -384,7 +387,7 @@ export function AddTransactionScreen({
                       </span>
                       <span
                         className={cx(
-                          "w-full truncate text-xs leading-tight",
+                          "w-full break-words text-[11px] leading-[1.2]",
                           selected ? "text-ink" : "text-muted",
                         )}
                       >

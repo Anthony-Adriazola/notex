@@ -1,7 +1,8 @@
 # Guía rápida de Notex
 
-Notex sirve para anotar los gastos del día y saber cuánto se gastó en la semana,
-en el mes y en el año. Todo queda guardado en la laptop y en el celular.
+Notex sirve para anotar los gastos de la comercializadora y saber cuánto se gastó
+en la semana, en el mes y en el año. Todo queda guardado en la laptop y en el
+celular.
 
 ## Abrir la app
 
@@ -15,12 +16,13 @@ En el celular, abrir **Notex** como cualquier otra app.
 
 1. Tocar **Agregar** (el botón claro del centro, abajo).
 2. Escribir el monto con el teclado. Por ejemplo, `25,50`.
-3. Elegir la categoría (Alimentación, Transporte, etc.).
+3. Elegir la categoría (Compra de mercadería, Proveedores, Fletes, Combustible, etc.).
 4. Revisar la cuenta y la fecha, que ya vienen elegidas.
 5. Tocar **Guardar gasto**.
 
-Para un ingreso, elegir **Ingreso** arriba del monto. Para pasar plata del banco
-al efectivo, elegir **Transferencia**: no cuenta como gasto.
+Para un ingreso, elegir **Ingreso** arriba del monto y la categoría (Ventas,
+Cobranzas u Otros ingresos). Para pasar dinero del banco a la caja, elegir
+**Transferencia**: no cuenta como gasto.
 
 ## Ver los totales
 
@@ -30,25 +32,26 @@ La pantalla **Resumen** muestra:
 - La comparación con el mes anterior.
 - El promedio diario.
 - Cuánto queda del presupuesto.
-- En qué categorías se fue la plata.
+- En qué se fue el dinero de la empresa.
 
 ## Pagos que se repiten
 
-En **Ajustes → Recurrentes** se pueden crear el alquiler, la luz, el internet o
-cualquier pago fijo. Cuando vence, aparece en **Pendientes**.
+En **Ajustes → Recurrentes** se pueden crear el alquiler del local, la luz, el
+internet, los sueldos o cualquier pago fijo. En **Pendientes** se ve el mes
+completo, con el estado de cada pago:
 
-Ahí se puede:
+- **Pendiente:** ya venció y falta confirmarlo.
+- **Pagado:** ya se registró este mes.
+- **Próximo:** todavía no vence, pero se puede pagar antes.
+- **Saltado:** este mes no correspondía.
 
-- **Registrar** el pago con el monto que vino.
-- Corregir el monto antes de registrarlo.
-- **Saltar** ese mes si no corresponde.
-
-Nunca se registra solo: siempre se confirma.
+Se puede corregir el monto antes de registrar y elegir **Saltar** si no
+corresponde. Nunca se registra solo.
 
 ## Presupuestos
 
-En **Presupuestos** se escribe cuánto se quiere gastar en cada categoría durante
-el mes. La barra cambia de color al llegar al 80% y al 100%.
+En **Presupuestos** se escribe cuánto se quiere gastar en cada categoría del
+negocio durante el mes. La barra cambia de color al llegar al 80% y al 100%.
 
 ## Sincronizar con el celular
 

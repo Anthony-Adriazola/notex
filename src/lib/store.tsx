@@ -10,10 +10,11 @@ import {
 } from "react";
 
 import { api } from "./api";
+import { monthKey } from "./format";
 import type {
   AccountBalance,
   Category,
-  Occurrence,
+  RecurringOccurrence,
   SyncStatus,
 } from "./types";
 
@@ -21,7 +22,7 @@ interface StoreValue {
   accounts: AccountBalance[];
   categories: Category[];
   settings: Record<string, string>;
-  pending: Occurrence[];
+  pending: RecurringOccurrence[];
   sync: SyncStatus | null;
   syncBusy: boolean;
   version: number;
@@ -39,7 +40,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState<AccountBalance[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
-  const [pending, setPending] = useState<Occurrence[]>([]);
+  const [pending, setPending] = useState<RecurringOccurrence[]>([]);
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [version, setVersion] = useState(0);
@@ -54,12 +55,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           api.accounts(),
           api.categories(),
           api.settings(),
-          api.occurrences(),
+          api.monthOccurrences(monthKey()),
         ]);
       setAccounts(nextAccounts);
       setCategories(nextCategories);
       setSettings(nextSettings);
-      setPending(nextPending);
+      setPending(nextPending.filter((item) => item.status === "pending"));
       setError(null);
       setVersion((value) => value + 1);
     } catch (cause) {

@@ -10,6 +10,39 @@ use crate::models::*;
 const SEED_TIME: &str = "2026-01-01T00:00:00Z";
 const SEED_DEVICE: &str = "seed";
 
+const BUSINESS_CATEGORIES: [(&str, &str, &str, &str, &str); 17] = [
+    ("cat-goods", "Compra de mercadería", "expense", "#d9a441", "package"),
+    ("cat-suppliers", "Proveedores", "expense", "#c2a184", "handshake"),
+    ("cat-freight", "Fletes y transporte", "expense", "#8aa9c9", "truck"),
+    ("cat-fuel", "Combustible", "expense", "#d98a7d", "fuel"),
+    ("cat-rent", "Alquiler del local", "expense", "#b08d6a", "store"),
+    ("cat-utilities", "Servicios", "expense", "#d9c27a", "zap"),
+    ("cat-payroll", "Sueldos y cargas", "expense", "#a99bc9", "users"),
+    ("cat-taxes", "Impuestos y tasas", "expense", "#9db8d6", "landmark"),
+    ("cat-marketing", "Publicidad", "expense", "#c99ab0", "megaphone"),
+    ("cat-packaging", "Empaques e insumos", "expense", "#8fb996", "package-open"),
+    ("cat-maintenance", "Mantenimiento", "expense", "#9a968f", "wrench"),
+    ("cat-fees", "Comisiones y bancos", "expense", "#b8a27a", "percent"),
+    ("cat-travel", "Viáticos", "expense", "#8aa9c9", "plane"),
+    ("cat-other", "Otros gastos", "expense", "#9a968f", "circle-ellipsis"),
+    ("cat-sales", "Ventas", "income", "#8fb996", "shopping-bag"),
+    ("cat-collections", "Cobranzas", "income", "#8aa9c9", "hand-coins"),
+    ("cat-other-income", "Otros ingresos", "income", "#9db8d6", "plus-circle"),
+];
+
+const OLD_PERSONAL_CATEGORIES: [&str; 9] = [
+    "cat-food",
+    "cat-transport",
+    "cat-home",
+    "cat-health",
+    "cat-education",
+    "cat-leisure",
+    "cat-clothing",
+    "cat-salary",
+    "cat-extra",
+];
+
+
 pub fn now_iso() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
@@ -172,7 +205,7 @@ pub fn seed(conn: &Connection) -> rusqlite::Result<()> {
     }
 
     let accounts = [
-        ("acc-cash", "Efectivo", "cash"),
+        ("acc-cash", "Caja", "cash"),
         ("acc-bank", "Banco", "bank"),
     ];
     for (id, name, kind) in accounts {
@@ -184,20 +217,7 @@ pub fn seed(conn: &Connection) -> rusqlite::Result<()> {
         )?;
     }
 
-    let categories = [
-        ("cat-food", "Alimentación", "expense", "#d9a441", "utensils"),
-        ("cat-transport", "Transporte", "expense", "#8aa9c9", "bus"),
-        ("cat-home", "Vivienda", "expense", "#c2a184", "house"),
-        ("cat-utilities", "Servicios", "expense", "#d9c27a", "zap"),
-        ("cat-health", "Salud", "expense", "#d98a7d", "heart-pulse"),
-        ("cat-education", "Educación", "expense", "#a99bc9", "graduation-cap"),
-        ("cat-leisure", "Ocio", "expense", "#8fb996", "coffee"),
-        ("cat-clothing", "Ropa", "expense", "#c99ab0", "shirt"),
-        ("cat-other", "Otros gastos", "expense", "#9a968f", "circle-ellipsis"),
-        ("cat-salary", "Sueldo", "income", "#8fb996", "wallet"),
-        ("cat-extra", "Ingreso extra", "income", "#8aa9c9", "plus-circle"),
-    ];
-    for (id, name, kind, color, icon) in categories {
+    for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
         conn.execute(
             "INSERT OR IGNORE INTO categories
              (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
@@ -208,6 +228,35 @@ pub fn seed(conn: &Connection) -> rusqlite::Result<()> {
 
     set_setting(conn, "seeded", "1")?;
     Ok(())
+}
+
+pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
+    if get_setting(conn, "business_defaults_v1")?.is_some() {
+        return Ok(false);
+    }
+    let now = now_iso();
+    for (id, name, kind, color, icon) in BUSINESS_CATEGORIES {
+        conn.execute(
+            "INSERT OR IGNORE INTO categories
+             (id, name, kind, color, icon, budget_cents, archived, created_at, updated_at, device_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, ?6, ?6, ?7)",
+            params![id, name, kind, color, icon, SEED_TIME, SEED_DEVICE],
+        )?;
+    }
+    conn.execute(
+        "UPDATE accounts SET name = 'Caja', updated_at = ?1
+         WHERE id = 'acc-cash' AND name = 'Efectivo'",
+        params![&now],
+    )?;
+    for id in OLD_PERSONAL_CATEGORIES {
+        conn.execute(
+            "UPDATE categories SET archived = 1, updated_at = ?1
+             WHERE id = ?2 AND archived = 0",
+            params![&now, id],
+        )?;
+    }
+    set_setting(conn, "business_defaults_v1", "1")?;
+    Ok(true)
 }
 
 fn row_account_balance(row: &Row<'_>) -> rusqlite::Result<AccountBalance> {
@@ -995,6 +1044,93 @@ pub fn occurrences(conn: &Connection, today: NaiveDate) -> rusqlite::Result<Vec<
     Ok(out)
 }
 
+pub fn month_occurrences(
+    conn: &Connection,
+    month: &str,
+    today: NaiveDate,
+) -> rusqlite::Result<Vec<RecurringOccurrence>> {
+    let mut parts = month.split('-');
+    let year = parts
+        .next()
+        .and_then(|value| value.parse::<i32>().ok())
+        .unwrap_or(today.year());
+    let month_number = parts
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        .filter(|value| (1..=12).contains(value))
+        .unwrap_or(today.month());
+    let (from, to) = month_bounds(year, month_number);
+    let recurring = list_recurring(conn)?;
+    let mut out = Vec::new();
+
+    for item in recurring.into_iter().filter(|row| row.active) {
+        let Ok(start) = NaiveDate::parse_from_str(&item.start_date, "%Y-%m-%d") else {
+            continue;
+        };
+        let mut cursor = start;
+        let mut guard = 0;
+        while cursor <= to && guard < 800 {
+            if cursor >= from {
+                let key = cursor.to_string();
+                let paid: Option<(String, i64)> = conn
+                    .query_row(
+                        "SELECT id, amount_cents FROM transactions
+                         WHERE recurring_id = ?1 AND date = ?2 AND deleted_at IS NULL
+                         ORDER BY created_at DESC LIMIT 1",
+                        params![item.id, key],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .optional()?;
+                let skipped = is_skipped(conn, &item.id, &key)?;
+                let status = if paid.is_some() {
+                    "paid"
+                } else if skipped {
+                    "skipped"
+                } else if cursor <= today {
+                    "pending"
+                } else {
+                    "upcoming"
+                };
+                out.push(RecurringOccurrence {
+                    recurring_id: item.id.clone(),
+                    name: item.name.clone(),
+                    kind: item.kind.clone(),
+                    amount_cents: item.amount_cents,
+                    due_date: key,
+                    status: status.into(),
+                    paid_amount_cents: paid.as_ref().map(|(_, amount)| *amount),
+                    transaction_id: paid.map(|(id, _)| id),
+                    category_id: item.category_id.clone(),
+                    category_name: item.category_name.clone().unwrap_or_default(),
+                    category_color: item
+                        .category_color
+                        .clone()
+                        .unwrap_or_else(|| "#8d8d8d".into()),
+                    category_icon: item
+                        .category_icon
+                        .clone()
+                        .unwrap_or_else(|| "circle-ellipsis".into()),
+                    account_id: item.account_id.clone(),
+                    account_name: item.account_name.clone().unwrap_or_default(),
+                    note: item.note.clone(),
+                });
+            }
+            let Some(next) = advance(cursor, &item.frequency) else {
+                break;
+            };
+            cursor = next;
+            guard += 1;
+        }
+    }
+
+    out.sort_by(|a, b| {
+        a.due_date
+            .cmp(&b.due_date)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    Ok(out)
+}
+
 pub fn register_occurrence(
     conn: &Connection,
     input: &OccurrenceInput,
@@ -1149,4 +1285,87 @@ pub fn get_recurring(conn: &Connection, id: &str) -> rusqlite::Result<Recurring>
         [id],
         row_recurring,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{OccurrenceInput, RecurringInput};
+
+    #[test]
+    fn monthly_occurrences_track_paid_and_skipped() {
+        let dir = std::env::temp_dir().join(format!("notex-month-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("test.db");
+        let _ = std::fs::remove_file(&path);
+        let conn = open(&path).unwrap();
+        migrate(&conn).unwrap();
+        seed(&conn).unwrap();
+        upgrade_business_defaults(&conn).unwrap();
+        let device = device_id(&conn).unwrap();
+
+        let recurring = create_recurring(
+            &conn,
+            &RecurringInput {
+                name: "Internet".into(),
+                kind: "expense".into(),
+                amount_cents: 32000,
+                account_id: "acc-bank".into(),
+                category_id: "cat-utilities".into(),
+                frequency: "monthly".into(),
+                start_date: "2026-11-05".into(),
+                note: None,
+            },
+            &device,
+        )
+        .unwrap();
+
+        let today = NaiveDate::from_ymd_opt(2026, 11, 14).unwrap();
+        let items = month_occurrences(&conn, "2026-11", today).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].status, "pending");
+
+        register_occurrence(
+            &conn,
+            &OccurrenceInput {
+                recurring_id: recurring.id.clone(),
+                due_date: "2026-11-05".into(),
+                amount_cents: 32000,
+                note: None,
+            },
+            &device,
+        )
+        .unwrap();
+
+        let items = month_occurrences(&conn, "2026-11", today).unwrap();
+        assert_eq!(items[0].status, "paid");
+        assert_eq!(items[0].paid_amount_cents, Some(32000));
+        assert!(items[0].transaction_id.is_some());
+
+        let second = create_recurring(
+            &conn,
+            &RecurringInput {
+                name: "Luz".into(),
+                kind: "expense".into(),
+                amount_cents: 18000,
+                account_id: "acc-bank".into(),
+                category_id: "cat-utilities".into(),
+                frequency: "monthly".into(),
+                start_date: "2026-11-25".into(),
+                note: None,
+            },
+            &device,
+        )
+        .unwrap();
+        let items = month_occurrences(&conn, "2026-11", today).unwrap();
+        let luz = items.iter().find(|item| item.recurring_id == second.id).unwrap();
+        assert_eq!(luz.status, "upcoming");
+
+        skip_occurrence(&conn, &second.id, "2026-11-25").unwrap();
+        let items = month_occurrences(&conn, "2026-11", today).unwrap();
+        let luz = items.iter().find(|item| item.recurring_id == second.id).unwrap();
+        assert_eq!(luz.status, "skipped");
+
+        let _ = std::fs::remove_file(&path);
+    }
 }

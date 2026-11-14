@@ -304,6 +304,16 @@ pub fn occurrences(state: State<'_, AppState>) -> Result<Vec<Occurrence>, String
 }
 
 #[tauri::command]
+pub fn month_occurrences(
+    state: State<'_, AppState>,
+    month: String,
+) -> Result<Vec<RecurringOccurrence>, String> {
+    parse_month(&month)?;
+    let conn = lock(&state)?;
+    db::month_occurrences(&conn, &month, db::today()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn register_occurrence(
     state: State<'_, AppState>,
     input: OccurrenceInput,

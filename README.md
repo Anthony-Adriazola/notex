@@ -1,10 +1,12 @@
 # Notex
 
-Gestor de gastos personales, privado y local-first, para Windows y Android.
+Gestor de gastos para una comercializadora, privado y local-first, para Windows
+y Android.
 
-Notex registra gastos e ingresos en segundos, muestra cuánto se gastó hoy, esta
-semana, este mes y este año, controla presupuestos, avisa de pagos recurrentes y
-sincroniza la laptop con el celular sin cuentas en la nube.
+Notex registra las compras, los pagos a proveedores y los gastos de operación en
+segundos. Muestra cuánto gastó el negocio hoy, esta semana, este mes y este año,
+controla presupuestos, sigue los pagos recurrentes mes a mes y sincroniza la
+laptop con el celular sin cuentas en la nube.
 
 - **Moneda:** bolivianos (`Bs 1.234,56`), español de Bolivia.
 - **Escritorio:** Windows (Tauri 2 + WebView2).

@@ -231,3 +231,23 @@ export interface SyncStatus {
   serverSeq: number;
   deviceId: string;
 }
+
+export type OccurrenceStatus = "pending" | "paid" | "skipped" | "upcoming";
+
+export interface RecurringOccurrence {
+  recurringId: string;
+  name: string;
+  kind: "expense" | "income";
+  amountCents: number;
+  dueDate: string;
+  status: OccurrenceStatus;
+  paidAmountCents: number | null;
+  transactionId: string | null;
+  categoryId: string;
+  categoryName: string;
+  categoryColor: string;
+  categoryIcon: string;
+  accountId: string;
+  accountName: string;
+  note: string;
+}

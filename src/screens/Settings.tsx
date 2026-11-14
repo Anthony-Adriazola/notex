@@ -36,6 +36,7 @@ import type {
 } from "../lib/types";
 import {
   Button,
+  ConfirmBar,
   Field,
   IconButton,
   Micro,
@@ -170,7 +171,7 @@ function AccountForm({ onDone }: { onDone: () => void }) {
             value={kind}
             onChange={(event) => setKind(event.target.value as "cash" | "bank")}
           >
-            <option value="cash">Efectivo</option>
+            <option value="cash">Caja</option>
             <option value="bank">Banco</option>
           </Select>
         </Field>
@@ -244,7 +245,7 @@ function CategoryForm({
           <TextInput
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Ej. Mascotas"
+            placeholder="Ej. Seguros"
           />
         </Field>
         <Field label="Ícono">
@@ -330,7 +331,9 @@ function RecurringForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const options = categories.filter((category) => category.kind === kind);
+  const options = categories.filter(
+    (category) => category.kind === kind && !category.archived,
+  );
 
   useEffect(() => {
     if (options.some((category) => category.id === categoryId)) return;
@@ -755,6 +758,12 @@ export function SettingsScreen() {
     useStore();
   const { show } = useToast();
   const [showAccountForm, setShowAccountForm] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<{
+    type: "account" | "category" | "recurring";
+    id: string;
+    name: string;
+  } | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
   const [categoryKind, setCategoryKind] = useState<"expense" | "income">(
@@ -783,6 +792,39 @@ export function SettingsScreen() {
 
   const activeAccounts = accounts.filter((account) => !account.archived);
   const activeRecurring = recurring.filter((item) => item.active);
+
+  const askArchive = (
+    type: "account" | "category" | "recurring",
+    id: string,
+    name: string,
+  ) => setArchiveTarget({ type, id, name });
+
+  const runArchive = async () => {
+    if (!archiveTarget) return;
+    setArchiving(true);
+    try {
+      if (archiveTarget.type === "account") {
+        await api.archiveAccount(archiveTarget.id);
+      } else if (archiveTarget.type === "category") {
+        await api.archiveCategory(archiveTarget.id);
+      } else {
+        await api.archiveRecurring(archiveTarget.id);
+      }
+      await refresh();
+      show(
+        archiveTarget.type === "account"
+          ? "Cuenta archivada"
+          : archiveTarget.type === "category"
+            ? "Categoría archivada"
+            : "Recurrente archivado",
+      );
+      setArchiveTarget(null);
+    } catch (cause) {
+      show(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const backup = async () => {
     setBusy("backup");
@@ -820,7 +862,7 @@ export function SettingsScreen() {
       <div className="flex flex-col gap-4">
         <Section
           title="Preferencias"
-          description="La app usa bolivianos y español de Bolivia."
+          description="Para la comercializadora: bolivianos y español de Bolivia."
         >
           <div className="flex items-center justify-between gap-4 px-5 py-4">
             <div>
@@ -841,7 +883,7 @@ export function SettingsScreen() {
 
         <Section
           title="Cuentas"
-          description="Efectivo y banco. Las transferencias mueven saldo sin contar como gasto."
+          description="Caja y banco. Las transferencias mueven saldo sin contar como gasto."
           action={
             <Button
               size="sm"
@@ -862,7 +904,7 @@ export function SettingsScreen() {
                 <div className="min-w-0">
                   <p className="truncate text-[15px] text-ink">{account.name}</p>
                   <p className="mt-0.5 font-mono text-[0.625rem] uppercase tracking-[0.1em] text-dim">
-                    {account.kind === "cash" ? "Efectivo" : "Banco"}
+                    {account.kind === "cash" ? "Caja" : "Banco"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -873,18 +915,9 @@ export function SettingsScreen() {
                   />
                   <IconButton
                     label={`Archivar ${account.name}`}
-                    onClick={async () => {
-                      if (
-                        !window.confirm(
-                          `¿Archivar "${account.name}"? Los movimientos se conservan.`,
-                        )
-                      ) {
-                        return;
-                      }
-                      await api.archiveAccount(account.id);
-                      await refresh();
-                      show("Cuenta archivada");
-                    }}
+                    onClick={() =>
+                      askArchive("account", account.id, account.name)
+                    }
                   >
                     <Archive className="h-4 w-4" strokeWidth={1.75} />
                   </IconButton>
@@ -924,7 +957,10 @@ export function SettingsScreen() {
           </div>
           <div className="divide-y divide-line/70">
             {categories
-              .filter((category) => category.kind === categoryKind)
+              .filter(
+                (category) =>
+                  category.kind === categoryKind && !category.archived,
+              )
               .map((category) => (
                 <div
                   key={category.id}
@@ -982,18 +1018,9 @@ export function SettingsScreen() {
                     </label>
                     <IconButton
                       label={`Archivar ${category.name}`}
-                      onClick={async () => {
-                        if (
-                          !window.confirm(
-                            `¿Archivar "${category.name}"? Los movimientos se conservan.`,
-                          )
-                        ) {
-                          return;
-                        }
-                        await api.archiveCategory(category.id);
-                        await refresh();
-                        show("Categoría archivada");
-                      }}
+                      onClick={() =>
+                        askArchive("category", category.id, category.name)
+                      }
                     >
                       <Archive className="h-4 w-4" strokeWidth={1.75} />
                     </IconButton>
@@ -1061,11 +1088,9 @@ export function SettingsScreen() {
                     />
                     <IconButton
                       label={`Archivar ${item.name}`}
-                      onClick={async () => {
-                        await api.archiveRecurring(item.id);
-                        await refresh();
-                        show("Recurrente archivado");
-                      }}
+                      onClick={() =>
+                        askArchive("recurring", item.id, item.name)
+                      }
                     >
                       <Archive className="h-4 w-4" strokeWidth={1.75} />
                     </IconButton>
@@ -1148,6 +1173,21 @@ export function SettingsScreen() {
         <p className="px-1 pb-2 text-center text-xs text-dim">
           Notex · Hecho para que anotar un gasto tome segundos.
         </p>
+
+        {archiveTarget ? (
+          <ConfirmBar
+            message={
+              archiveTarget.type === "account"
+                ? `¿Archivar la cuenta "${archiveTarget.name}"? Los movimientos se conservan.`
+                : archiveTarget.type === "category"
+                  ? `¿Archivar la categoría "${archiveTarget.name}"? Los movimientos se conservan.`
+                  : `¿Archivar el recurrente "${archiveTarget.name}"? Dejará de aparecer en Pendientes.`
+            }
+            busy={archiving}
+            onConfirm={() => void runArchive()}
+            onCancel={() => setArchiveTarget(null)}
+          />
+        ) : null}
       </div>
     </div>
   );
