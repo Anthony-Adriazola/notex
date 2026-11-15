@@ -67,6 +67,18 @@ Deben pasar, entre otros:
 - `sync_store::tests::sync_category_keeps_monthly_fields`
 - `sync_store::tests::sync_planned_payment_keeps_amount_and_method`
 - `sync_store::tests::sync_concept_skip_is_applied`
+- `concept_tests::create_category_stores_monthly_fields`
+
+### Alta real obligatoria
+
+Antes de publicar, hacer en la app (no solo por tests):
+
+1. Crear un concepto de gasto, uno de ingreso y uno mensual.
+2. Editarlo desde Ajustes.
+3. Registrar un movimiento Efectivo y uno QR.
+4. Crear y pagar un pendiente puntual.
+
+Si un `INSERT` tiene columnas nuevas, su test debe ejecutar el **alta completa**. El error `wrong number of parameters passed to query. Got N need M` es exactamente un placeholder sin su `params![]`; no publicar hasta correr el alta.
 
 ### Prueba real de ida y vuelta
 
@@ -122,9 +134,17 @@ Criterios:
 ### Cómo probar
 
 - App de escritorio: `npm run tauri dev`.
-- Build web + viewport de 390 × 844 en el navegador para revisar layout.
+- **Verificación móvil automática:** `npm run mobile:check`.
+  - Construye el frontend, levanta un servidor local y abre Chromium con **390 × 844**, `deviceScaleFactor: 2`, táctil.
+  - Entra a Resumen, Pendientes, Pendientes pagados, formulario de pendiente, Agregar, modal de concepto, Ajustes, modal de concepto, Movimientos, Reportes y Presupuestos.
+  - Guarda capturas en `docs/mobile-check/`.
+  - Falla si hay desborde horizontal o errores de consola; muestra cuáles.
+  - Requiere `CHROME_PATH` si el Chromium no está en la ruta cacheada de Playwright.
 - Android: `npm run tauri android build -- --apk --target aarch64` e instalar el APK firmado.
 - Si se prueba con mock, el mock debe devolver las mismas formas que los comandos reales (`monthly_concepts`, `planned_payments`, `reminders`, etc.).
+- La grilla de “¿Qué estás pagando?” en celular usa **2 columnas** con ícono+nombre; el botón **Nuevo** está arriba, no al final.
+- “Pagados y saltados” queda **colapsado** por defecto y sus filas son compactas.
+- Reportes y Presupuestos se abren desde Resumen; el ítem Resumen queda activo en la barra inferior.
 
 ---
 

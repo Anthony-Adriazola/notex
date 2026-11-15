@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Plus, Trash2 } from "lucide-react";
 
 import { CategoryIcon } from "../lib/icons";
 import { api } from "../lib/api";
@@ -11,7 +11,6 @@ import {
   Dialog,
   Field,
   Micro,
-  PageHeader,
   Panel,
   Segmented,
   TextInput,
@@ -169,20 +168,24 @@ export function AddTransactionScreen({
 
   return (
     <div className="notex-screen">
-      <PageHeader
-        title={editing ? "Editar movimiento" : "Nuevo movimiento"}
-        subtitle={
-          categoryKind === "income"
+      <div className="mb-7">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mb-3 inline-flex h-11 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-sm text-muted transition-colors hover:border-line-strong hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+          Volver
+        </button>
+        <h1 className="font-serif text-[2rem] leading-[1.05] font-semibold tracking-[-0.015em] text-ink sm:text-[2.35rem]">
+          {editing ? "Editar movimiento" : "Nuevo movimiento"}
+        </h1>
+        <p className="mt-1.5 text-sm text-muted">
+          {categoryKind === "income"
             ? "Escribe el monto y elegí de dónde viene el ingreso."
-            : "Escribe el monto, elegí qué estás pagando y con qué medio."
-        }
-        actions={
-          <Button variant="ghost" onClick={onCancel}>
-            <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
-            Volver
-          </Button>
-        }
-      />
+            : "Escribe el monto, elegí qué estás pagando y con qué medio."}
+        </p>
+      </div>
 
       <form
         className="mx-auto flex w-full max-w-3xl flex-col gap-4"
@@ -232,11 +235,18 @@ export function AddTransactionScreen({
                 ? "¿Qué estás cobrando?"
                 : "¿Qué estás pagando?"}
             </Micro>
-            <span className="text-xs text-dim">
-              {visibleCategories.length} conceptos
-            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowNewConcept(true)}
+              >
+                <Plus className="h-4 w-4" strokeWidth={2} />
+                Nuevo
+              </Button>
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {visibleCategories.map((category) => {
               const selected = category.id === categoryId;
               return (
@@ -246,33 +256,39 @@ export function AddTransactionScreen({
                   aria-pressed={selected}
                   onClick={() => setCategoryId(category.id)}
                   className={cx(
-                    "flex min-h-[4.75rem] flex-col items-start justify-between rounded-lg border p-2.5 text-left transition-colors",
+                    "flex min-h-[4rem] items-center gap-2.5 rounded-lg border p-3 text-left transition-colors",
                     selected
                       ? "border-ink bg-raised"
                       : "border-line bg-panel hover:border-line-strong hover:bg-raised/70",
                   )}
                 >
-                  <span style={{ color: category.color }}>
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line/60 bg-sunken"
+                    style={{ color: category.color }}
+                  >
                     <CategoryIcon name={category.icon} className="h-4 w-4" />
                   </span>
                   <span
                     className={cx(
-                      "w-full break-words text-[11px] leading-[1.2]",
+                      "min-w-0 flex-1 break-words text-[13px] leading-[1.2]",
                       selected ? "text-ink" : "text-muted",
                     )}
                   >
                     {category.name}
                   </span>
+                  {selected ? (
+                    <Check className="h-4 w-4 shrink-0" strokeWidth={2.25} />
+                  ) : null}
                 </button>
               );
             })}
             <button
               type="button"
               onClick={() => setShowNewConcept((value) => !value)}
-              className="flex min-h-[4.75rem] flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line-strong bg-transparent text-muted transition-colors hover:border-ink hover:text-ink"
+              className="flex min-h-[4rem] items-center justify-center gap-2 rounded-lg border border-dashed border-line-strong bg-transparent text-muted transition-colors hover:border-ink hover:text-ink"
             >
               <Plus className="h-4 w-4" strokeWidth={2} />
-              <span className="text-[11px]">Nuevo</span>
+              <span className="text-[13px]">Nuevo</span>
             </button>
           </div>
         </div>

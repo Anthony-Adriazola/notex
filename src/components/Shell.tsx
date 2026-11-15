@@ -224,7 +224,10 @@ export function Shell({
         <div className="grid grid-cols-5">
           {MOBILE_NAV.map((item) => {
             const Icon = item.icon;
-            const active = route === item.route;
+            const active =
+              route === item.route ||
+              (item.route === "dashboard" &&
+                (route === "reports" || route === "budgets"));
             if (item.route === "add") {
               return (
                 <button

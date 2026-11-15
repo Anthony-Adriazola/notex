@@ -37,6 +37,7 @@ import {
   Users,
   Utensils,
   Wallet,
+  Wifi,
   Wrench,
   Zap,
 } from "lucide-react";
@@ -73,6 +74,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   boxes: Boxes,
   receipt: ReceiptText,
   building: Building2,
+  wifi: Wifi,
 };
 
 export const CATEGORY_ICON_NAMES = Object.keys(CATEGORY_ICONS);
@@ -109,6 +111,7 @@ export const CATEGORY_ICON_LABELS: Record<string, string> = {
   boxes: "Cajas",
   receipt: "Recibos",
   building: "Edificio",
+  wifi: "Wifi",
 };
 
 export function CategoryIcon({

@@ -889,7 +889,7 @@ export function SettingsScreen() {
     <div className="notex-screen">
       <PageHeader
         title="Ajustes"
-        subtitle="Cuentas, categorías, recurrentes y tus datos."
+        subtitle="Conceptos, preferencias y tus datos."
       />
 
       <div className="flex flex-col gap-4">
@@ -971,7 +971,6 @@ export function SettingsScreen() {
           description="Lo que pagás. Marcá los que se pagan cada mes para que aparezcan en Pendientes."
           action={
             <Button
-              size="sm"
               variant="outline"
               onClick={() => {
                 setEditingCategory(null);
@@ -1003,7 +1002,7 @@ export function SettingsScreen() {
               .map((category) => (
                 <div
                   key={category.id}
-                  className="flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                  className="flex items-center justify-between gap-3 px-5 py-3.5"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <span
@@ -1027,35 +1026,7 @@ export function SettingsScreen() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex w-full items-center gap-1 pl-11 sm:w-auto sm:pl-0">
-                    <label className="flex flex-1 items-center gap-2 sm:flex-none">
-                      <span className="sr-only">
-                        Presupuesto mensual de {category.name}
-                      </span>
-                      <TextInput
-                        defaultValue={
-                          category.budgetCents
-                            ? (category.budgetCents / 100).toFixed(2)
-                            : ""
-                        }
-                        key={`${category.id}-${category.budgetCents ?? 0}`}
-                        inputMode="decimal"
-                        placeholder="0,00"
-                        className="h-9 w-full text-right font-mono text-sm sm:w-24"
-                        onBlur={async (event) => {
-                          const cents = parseAmountToCents(event.target.value);
-                          if (cents === (category.budgetCents ?? 0)) return;
-                          await api.setCategoryBudget(
-                            category.id,
-                            cents > 0 ? cents : null,
-                          );
-                          await refresh();
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") event.currentTarget.blur();
-                        }}
-                      />
-                    </label>
+                  <div className="flex shrink-0 items-center gap-1">
                     <IconButton
                       label={`Editar ${category.name}`}
                       onClick={() => {
@@ -1123,7 +1094,7 @@ export function SettingsScreen() {
               {activeRecurring.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                  className="flex items-center justify-between gap-3 px-5 py-3.5"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <span

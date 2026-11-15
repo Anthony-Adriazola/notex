@@ -596,10 +596,10 @@ pub fn create_category(
 ) -> Result<Category, String> {
     let name = input.name.trim();
     if name.is_empty() {
-        return Err("La categoría necesita un nombre.".into());
+        return Err("El concepto necesita un nombre.".into());
     }
     if input.kind != "expense" && input.kind != "income" {
-        return Err("Tipo de categoría inválido.".into());
+        return Err("Tipo de concepto inválido.".into());
     }
     let id = new_id();
     let now = now_iso();
@@ -615,6 +615,9 @@ pub fn create_category(
             input.color,
             input.icon,
             input.budget_cents,
+            input.monthly as i64,
+            if input.monthly { input.due_day } else { None },
+            input.reminder_days.unwrap_or(3),
             now,
             device_id
         ],
@@ -2113,5 +2116,35 @@ mod local_save_tests {
         assert_eq!(method, "qr");
         assert_eq!(device, "dev-test");
         assert!(deleted.is_none());
+    }
+}
+
+#[cfg(test)]
+mod concept_tests {
+    use super::*;
+
+    #[test]
+    fn create_category_stores_monthly_fields() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        let concept = create_category(
+            &conn,
+            &CategoryInput {
+                name: "Concepto de prueba".into(),
+                kind: "expense".into(),
+                color: "#d9a441".into(),
+                icon: "gem".into(),
+                budget_cents: None,
+                monthly: true,
+                due_day: None,
+                reminder_days: Some(3),
+            },
+            "dev-test",
+        )
+        .unwrap();
+        assert!(concept.monthly);
+        assert!(concept.due_day.is_none());
+        assert_eq!(concept.reminder_days, 3);
+        assert_eq!(concept.name, "Concepto de prueba");
     }
 }

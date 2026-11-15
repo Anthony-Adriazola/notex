@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Check, ChevronRight, Plus, Repeat, X } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, ChevronRight, Plus, Repeat, X } from "lucide-react";
 
 import { CategoryIcon } from "../lib/icons";
 import { api } from "../lib/api";
@@ -68,8 +68,10 @@ function ConceptRow({
   amount,
   method,
   busy,
+  editing,
   onAmount,
   onMethod,
+  onToggleEdit,
   onRegister,
   onSkip,
 }: {
@@ -77,16 +79,39 @@ function ConceptRow({
   amount: string;
   method: "cash" | "qr";
   busy: boolean;
+  editing: boolean;
   onAmount: (value: string) => void;
   onMethod: (value: "cash" | "qr") => void;
+  onToggleEdit: () => void;
   onRegister: () => void;
   onSkip: () => void;
 }) {
   const actionable = item.status === "pending" || item.status === "upcoming";
+
+  if (!actionable) {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-sunken">
+          <Repeat className="h-4 w-4 text-muted" strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-ink">{item.name}</p>
+          <p className="mt-0.5 text-xs text-dim">
+            {item.status === "paid" ? "Pagado este mes" : "Saltado este mes"}
+          </p>
+        </div>
+        {item.status === "paid" && item.paidAmountCents !== null ? (
+          <Money cents={item.paidAmountCents} className="font-mono text-sm" />
+        ) : null}
+        <StatusChip status={item.status} />
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-4 sm:px-5">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-sunken">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-sunken">
           <Repeat className="h-4 w-4 text-muted" strokeWidth={1.75} />
         </div>
         <div className="min-w-0 flex-1">
@@ -97,11 +122,7 @@ function ConceptRow({
                 <span style={{ color: item.color }}>
                   <CategoryIcon name={item.icon} className="h-3 w-3" />
                 </span>
-                {item.status === "paid"
-                  ? "Pagado este mes"
-                  : item.kind === "income"
-                    ? "Ingreso mensual"
-                    : "Pago mensual"}
+                Pago mensual
               </p>
             </div>
             <StatusChip status={item.status} />
@@ -109,7 +130,7 @@ function ConceptRow({
         </div>
       </div>
 
-      {actionable ? (
+      {editing ? (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
           <label className="block sm:w-32">
             <Micro className="mb-1.5 block">Monto</Micro>
@@ -131,37 +152,51 @@ function ConceptRow({
               ]}
             />
           </div>
-          <div className="flex flex-1 gap-2 sm:justify-end">
-            <Button
-              variant="primary"
-              onClick={onRegister}
-              disabled={busy || parseAmountToCents(amount) <= 0}
-            >
-              <Check className="h-4 w-4" strokeWidth={2.25} />
-              Registrar
-            </Button>
-            <Button variant="ghost" onClick={onSkip} disabled={busy}>
-              <X className="h-4 w-4" strokeWidth={2} />
-              Saltar
-            </Button>
-          </div>
         </div>
       ) : (
-        <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
-          <span className="text-xs text-dim">
-            {item.status === "paid" ? "Pagado este mes" : "Saltado este mes"}
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-line/70 bg-sunken/50 px-3 py-2.5">
+          <span className="text-xs text-muted">Último pago</span>
+          <span className="flex items-center gap-2">
+            {item.lastAmountCents !== null ? (
+              <Money cents={item.lastAmountCents} className="font-mono text-sm text-ink" />
+            ) : (
+              <span className="text-sm text-dim">Sin monto</span>
+            )}
+            <span className="text-xs text-dim">· {method === "qr" ? "QR" : "Efectivo"}</span>
           </span>
-          <Money
-            cents={item.paidAmountCents ?? item.lastAmountCents ?? 0}
-            symbol={false}
-            className={
-              item.status === "paid"
-                ? "font-mono text-sm text-positive"
-                : "font-mono text-sm text-dim"
-            }
-          />
         </div>
       )}
+
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <Button
+          variant="primary"
+          className="w-full sm:w-auto"
+          onClick={onRegister}
+          disabled={busy || parseAmountToCents(amount) <= 0}
+        >
+          <Check className="h-4 w-4" strokeWidth={2.25} />
+          Registrar
+        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            className="flex-1 sm:flex-none"
+            onClick={onToggleEdit}
+            disabled={busy}
+          >
+            {editing ? "Listo" : "Cambiar"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="flex-1 sm:flex-none"
+            onClick={onSkip}
+            disabled={busy}
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+            Saltar
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -200,7 +235,6 @@ function PlannedRow({
         </div>
         <Money
           cents={item.amountCents}
-          symbol={false}
           className="shrink-0 font-mono text-sm"
         />
       </div>
@@ -240,6 +274,8 @@ export function PendingScreen({
   const [planned, setPlanned] = useState<PlannedPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [editRows, setEditRows] = useState<Record<string, boolean>>({});
+  const [settledOpen, setSettledOpen] = useState(false);
   const [methods, setMethods] = useState<Record<string, "cash" | "qr">>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [showPlannedForm, setShowPlannedForm] = useState(false);
@@ -414,11 +450,20 @@ export function PendingScreen({
       amount={amountFor(item)}
       method={methodFor(item)}
       busy={Boolean(busy[item.conceptId])}
+      editing={
+        Boolean(editRows[item.conceptId]) || item.lastAmountCents === null
+      }
       onAmount={(value) =>
         setDrafts((current) => ({ ...current, [item.conceptId]: value }))
       }
       onMethod={(value) =>
         setMethods((current) => ({ ...current, [item.conceptId]: value }))
+      }
+      onToggleEdit={() =>
+        setEditRows((current) => ({
+          ...current,
+          [item.conceptId]: !current[item.conceptId],
+        }))
       }
       onRegister={() => void register(item)}
       onSkip={() => void skip(item)}
@@ -462,14 +507,16 @@ export function PendingScreen({
               Para una fecha concreta, con aviso el día anterior.
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => setShowPlannedForm((value) => !value)}
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.25} />
-            Agregar pendiente
-          </Button>
+          {showPlannedForm ? null : (
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setShowPlannedForm(true)}
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.25} />
+              Agregar pendiente
+            </Button>
+          )}
         </div>
 
         {showPlannedForm ? (
@@ -635,22 +682,32 @@ export function PendingScreen({
                 <div className="divide-y divide-line/70">{groups.upcoming.map(renderRow)}</div>
               </div>
             ) : null}
-            {groups.paid.length > 0 ? (
+            {groups.paid.length + groups.skipped.length > 0 ? (
               <div>
-                <div className="flex items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-2">
-                  <Micro>Pagados</Micro>
-                  <span className="num text-xs text-dim">{groups.paid.length}</span>
-                </div>
-                <div className="divide-y divide-line/70">{groups.paid.map(renderRow)}</div>
-              </div>
-            ) : null}
-            {groups.skipped.length > 0 ? (
-              <div>
-                <div className="flex items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-2">
-                  <Micro>Saltados</Micro>
-                  <span className="num text-xs text-dim">{groups.skipped.length}</span>
-                </div>
-                <div className="divide-y divide-line/70">{groups.skipped.map(renderRow)}</div>
+                <button
+                  type="button"
+                  onClick={() => setSettledOpen((value) => !value)}
+                  className="flex w-full items-center justify-between border-y border-line/70 bg-sunken/60 px-5 py-3 text-left transition-colors hover:bg-sunken"
+                >
+                  <span className="flex items-center gap-2">
+                    <Micro>Pagados y saltados</Micro>
+                    <span className="num text-xs text-dim">
+                      {groups.paid.length + groups.skipped.length}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-dim transition-transform ${
+                      settledOpen ? "rotate-180" : ""
+                    }`}
+                    strokeWidth={1.75}
+                  />
+                </button>
+                {settledOpen ? (
+                  <div className="divide-y divide-line/70">
+                    {groups.paid.map(renderRow)}
+                    {groups.skipped.map(renderRow)}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
