@@ -9,7 +9,7 @@ La app debe ser simple para un adulto mayor, en español, con montos en bolivian
 Ningún cambio se considera terminado si no se verificó:
 
 1. **La sincronización** entre las dos instalaciones.
-2. **La vista móvil** en el tamaño del teléfono del padre: **390 × 844 px** (Honor X6c).
+2. **La vista móvil** en el tamaño del teléfono del padre: **360 × 800 px** (Honor X6c).
 
 Si no se puede probar en el teléfono físico, se prueba con el mismo ancho de viewport y se deja constancia.
 No alcanza con que compile.
@@ -100,7 +100,7 @@ Si se toca el esquema o los defaults, actualizar **las dos** instalaciones a la 
 
 ## 2. Vista móvil obligatoria
 
-El padre usa un **Honor X6c**, Android 15, ~390 × 844 CSS px. La app tiene:
+El padre usa un **Honor X6c**, Android 15, ~360 × 800 CSS px. La app tiene:
 
 - barra superior con marca y estado de sync;
 - navegación inferior fija de 5 ítems: Resumen, Movimientos, Agregar, Pendientes, Ajustes;
@@ -108,7 +108,7 @@ El padre usa un **Honor X6c**, Android 15, ~390 × 844 CSS px. La app tiene:
 
 ### Checklist de pantallas
 
-Probar en 390 px de ancho y, si se puede, en el teléfono real:
+Probar en 360 px de ancho y, si se puede, en el teléfono real:
 
 - **Resumen:** banners de recordatorio/pendientes, tarjetas, últimos movimientos, sin desborde horizontal.
 - **Movimientos:** filtros, filas, método Efectivo/QR, botón de agregar.
@@ -135,7 +135,7 @@ Criterios:
 
 - App de escritorio: `npm run tauri dev`.
 - **Verificación móvil automática:** `npm run mobile:check`.
-  - Construye el frontend, levanta un servidor local y abre Chromium con **390 × 844**, `deviceScaleFactor: 2`, táctil.
+  - Construye el frontend, levanta un servidor local y abre Chromium con **360 × 800**, `deviceScaleFactor: 2`, táctil.
   - Entra a Resumen, Pendientes, Pendientes pagados, formulario de pendiente, Agregar, modal de concepto, Ajustes, modal de concepto, Movimientos, Reportes y Presupuestos.
   - Guarda capturas en `docs/mobile-check/`.
   - Falla si hay desborde horizontal o errores de consola; muestra cuáles.
@@ -170,7 +170,7 @@ Antes de publicar una versión:
 1. `npm run build` sin errores.
 2. `cargo test` sin fallos.
 3. Prueba de sincronización de ida y vuelta con las entidades tocadas.
-4. Revisión móvil de las pantallas afectadas en 390 px.
+4. Revisión móvil de las pantallas afectadas en 360 px.
 5. APK Android firmado + instalador Windows.
 6. Release con notas en español y ambas instalaciones.
 7. Verificar que la app abra con la base migrada, sin pendientes por defecto y sin errores en consola.

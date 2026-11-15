@@ -389,7 +389,7 @@ try {
     headless: true,
   });
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
+    viewport: { width: 360, height: 800 },
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
@@ -406,7 +406,8 @@ try {
             : d.categories;
         }
         if (command === "list_accounts") return [];
-        if (command === "get_settings") return { largeText: "false" };
+        if (command === "get_settings")
+          return { large_text: data.largeText ? "1" : "0" };
         if (command === "sync_status") return d.sync;
         if (command === "dashboard") return d.dashboard;
         if (command === "list_transactions") return d.transactions;
@@ -435,8 +436,9 @@ try {
       },
       convertFileSrc: (filePath) => filePath,
     };
-  }, mock);
+  }, { ...mock, largeText: process.env.LARGE_TEXT === "1" });
 
+  const PREFIX = process.env.LARGE_TEXT === "1" ? "lt-" : "";
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(String(error)));
@@ -448,11 +450,26 @@ try {
   await page.waitForTimeout(700);
 
   const shot = async (name) => {
-    await page.screenshot({ path: path.join(OUT, `${name}.png`) });
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(80);
+    await page.screenshot({ path: path.join(OUT, `${PREFIX}${name}.png`) });
+    const state = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+      maxScroll: document.documentElement.scrollHeight - window.innerHeight,
+    }));
+    if (state.maxScroll > 40) {
+      await page.evaluate(() =>
+        window.scrollTo(0, document.documentElement.scrollHeight),
+      );
+      await page.waitForTimeout(150);
+      await page.screenshot({
+        path: path.join(OUT, `${PREFIX}${name}-abajo.png`),
+      });
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
+    console.log(
+      `${PREFIX}${name}: overflow=${state.overflow} scroll=${state.maxScroll}px`,
     );
-    console.log(`${name}: overflow=${overflow}`);
   };
 
   const nav = async (label) => {
@@ -465,7 +482,7 @@ try {
   };
 
   await shot("01-resumen");
-  await nav("Pendientes");
+  await nav("Pend.");
   await shot("02-pendientes");
   await page
     .locator("main")
@@ -498,7 +515,7 @@ try {
   await shot("08-ajustes-modal");
   await page.getByRole("button", { name: "Cerrar" }).click();
 
-  await nav("Movimientos");
+  await nav("Movim.");
   await shot("09-movimientos");
 
   await nav("Resumen");

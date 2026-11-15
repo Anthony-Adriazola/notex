@@ -24,9 +24,9 @@ const NAV = [
 
 const MOBILE_NAV = [
   { route: "dashboard" as Route, label: "Resumen", icon: LayoutDashboard },
-  { route: "movements" as Route, label: "Movimientos", icon: ArrowLeftRight },
+  { route: "movements" as Route, label: "Movim.", icon: ArrowLeftRight },
   { route: "add" as Route, label: "Agregar", icon: Plus },
-  { route: "pending" as Route, label: "Pendientes", icon: CalendarClock },
+  { route: "pending" as Route, label: "Pend.", icon: CalendarClock },
   { route: "settings" as Route, label: "Ajustes", icon: Settings },
 ];
 

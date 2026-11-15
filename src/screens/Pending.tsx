@@ -611,35 +611,41 @@ export function PendingScreen({
         )}
       </Panel>
 
-      <div className="mb-4 grid grid-cols-3 divide-x divide-line rounded-panel border border-line bg-panel">
-        <div className="px-4 py-3">
-          <Micro>Pendientes</Micro>
+      <div className="mb-4 grid grid-cols-1 divide-y divide-line rounded-panel border border-line bg-panel sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:block">
+          <div>
+            <Micro>Pendientes</Micro>
+            <span className="mt-0.5 block text-[11px] text-dim">
+              {groups.pending.length} pagos
+            </span>
+          </div>
           <Money
             cents={pendingTotal}
             symbol={false}
-            className="mt-1 block font-mono text-[0.95rem]"
+            className="shrink-0 font-mono text-[0.95rem] sm:mt-1 sm:block"
           />
-          <span className="mt-0.5 block text-[11px] text-dim">
-            {groups.pending.length} pagos
-          </span>
         </div>
-        <div className="px-4 py-3">
-          <Micro>Pagados</Micro>
+        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:block">
+          <div>
+            <Micro>Pagados</Micro>
+            <span className="mt-0.5 block text-[11px] text-dim">
+              {groups.paid.length} pagos
+            </span>
+          </div>
           <Money
             cents={paidTotal}
             symbol={false}
-            className="mt-1 block font-mono text-[0.95rem] text-positive"
+            className="shrink-0 font-mono text-[0.95rem] text-positive sm:mt-1 sm:block"
           />
-          <span className="mt-0.5 block text-[11px] text-dim">
-            {groups.paid.length} pagos
-          </span>
         </div>
-        <div className="px-4 py-3">
-          <Micro>Saltados</Micro>
-          <span className="mt-1 block font-mono text-[0.95rem] text-muted">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 sm:block">
+          <div>
+            <Micro>Saltados</Micro>
+            <span className="mt-0.5 block text-[11px] text-dim">este mes</span>
+          </div>
+          <span className="shrink-0 font-mono text-[0.95rem] text-muted">
             {groups.skipped.length}
           </span>
-          <span className="mt-0.5 block text-[11px] text-dim">este mes</span>
         </div>
       </div>
 
