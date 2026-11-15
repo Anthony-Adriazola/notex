@@ -10,23 +10,20 @@ use crate::models::*;
 const SEED_TIME: &str = "2026-01-01T00:00:00Z";
 const SEED_DEVICE: &str = "seed";
 
-const BUSINESS_CATEGORIES: [(&str, &str, &str, &str, &str, bool, Option<i64>, i64); 20] = [
+const BUSINESS_CATEGORIES: [(&str, &str, &str, &str, &str, bool, Option<i64>, i64); 17] = [
     ("cat-goods", "Compra de mineral", "expense", "#d9a441", "gem", false, None, 3),
     ("cat-assay", "Análisis de ley", "expense", "#c99ab0", "flask-conical", false, None, 3),
-    ("cat-suppliers", "Proveedores", "expense", "#c2a184", "handshake", false, None, 3),
     ("cat-freight", "Fletes y transporte", "expense", "#8aa9c9", "truck", false, None, 3),
     ("cat-fuel", "Combustible", "expense", "#d98a7d", "fuel", false, None, 3),
-    ("cat-rent", "Alquiler del local", "expense", "#b08d6a", "store", true, Some(1), 3),
-    ("cat-electricity", "Luz", "expense", "#d9c27a", "zap", true, Some(5), 3),
-    ("cat-wifi", "Internet / Wifi", "expense", "#8aa9c9", "wifi", true, Some(10), 3),
+    ("cat-rent", "Alquiler del local", "expense", "#b08d6a", "store", false, None, 3),
+    ("cat-electricity", "Luz", "expense", "#d9c27a", "zap", false, None, 3),
+    ("cat-wifi", "Wifi", "expense", "#8aa9c9", "wifi", false, None, 3),
     ("cat-utilities", "Servicios", "expense", "#d9c27a", "zap", false, None, 3),
-    ("cat-payroll", "Sueldos y cargas", "expense", "#a99bc9", "users", false, None, 3),
+    ("cat-payroll", "Sueldos", "expense", "#a99bc9", "users", false, None, 3),
     ("cat-taxes", "Impuestos y regalías", "expense", "#9db8d6", "landmark", false, None, 3),
     ("cat-marketing", "Publicidad", "expense", "#c99ab0", "megaphone", false, None, 3),
-    ("cat-packaging", "Empaques e insumos", "expense", "#8fb996", "package-open", false, None, 3),
     ("cat-maintenance", "Maquinaria y mantenimiento", "expense", "#9a968f", "wrench", false, None, 3),
     ("cat-fees", "Comisiones y bancos", "expense", "#b8a27a", "percent", false, None, 3),
-    ("cat-travel", "Viáticos", "expense", "#8aa9c9", "plane", false, None, 3),
     ("cat-other", "Otros gastos", "expense", "#9a968f", "circle-ellipsis", false, None, 3),
     ("cat-sales", "Ventas de mineral", "income", "#8fb996", "shopping-bag", false, None, 3),
     ("cat-collections", "Cobranzas", "income", "#8aa9c9", "hand-coins", false, None, 3),
@@ -244,6 +241,22 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
             "#,
         )?;
     }
+    if version < 4 {
+        // Repara movimientos creados con el cruce de columnas de 0.2.0/0.2.1.
+        let local_device = device_id(conn).unwrap_or_else(|_| "dev-local".into());
+        conn.execute_batch(
+            "UPDATE transactions
+                SET payment_method = CASE WHEN account_id = 'acc-cash' THEN 'cash' ELSE 'qr' END
+              WHERE payment_method IS NULL OR payment_method NOT IN ('cash','qr');
+             UPDATE transactions SET deleted_at = NULL WHERE deleted_at IN ('cash','qr');",
+        )?;
+        conn.execute(
+            "UPDATE transactions SET device_id = ?1
+              WHERE device_id IS NULL OR device_id IN ('cash','qr')",
+            params![local_device],
+        )?;
+        conn.execute_batch("PRAGMA user_version = 4;")?;
+    }
     Ok(())
 }
 
@@ -396,6 +409,31 @@ pub fn upgrade_business_defaults(conn: &Connection) -> rusqlite::Result<bool> {
             }
         }
         set_setting(conn, "business_defaults_v3", "1")?;
+        changed = true;
+    }
+
+    if get_setting(conn, "business_defaults_v4")?.is_none() {
+        for id in ["cat-suppliers", "cat-travel", "cat-packaging"] {
+            conn.execute(
+                "UPDATE categories SET archived = 1, updated_at = ?2 WHERE id = ?1",
+                params![id, &now],
+            )?;
+        }
+        conn.execute(
+            "UPDATE categories SET name = 'Wifi', updated_at = ?1 WHERE id = 'cat-wifi'",
+            params![&now],
+        )?;
+        conn.execute(
+            "UPDATE categories SET name = 'Sueldos', updated_at = ?1 WHERE id = 'cat-payroll'",
+            params![&now],
+        )?;
+        conn.execute(
+            "UPDATE categories
+                SET monthly = 0, due_day = NULL, reminder_days = 3, updated_at = ?1
+              WHERE id IN ('cat-rent','cat-electricity','cat-wifi')",
+            params![&now],
+        )?;
+        set_setting(conn, "business_defaults_v4", "1")?;
         changed = true;
     }
 
@@ -775,7 +813,7 @@ pub fn save_transaction(
         "INSERT INTO transactions
          (id, kind, amount_cents, date, account_id, to_account_id, category_id, note, recurring_id,
           created_at, updated_at, payment_method, deleted_at, device_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?13, NULL, ?12)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, NULL, ?13)
          ON CONFLICT(id) DO UPDATE SET
              kind = excluded.kind,
              amount_cents = excluded.amount_cents,
@@ -2038,4 +2076,42 @@ pub fn reminders(conn: &Connection, today: NaiveDate) -> rusqlite::Result<Vec<Re
     }
     out.sort_by(|a, b| a.days_left.cmp(&b.days_left));
     Ok(out)
+}
+
+#[cfg(test)]
+mod local_save_tests {
+    use super::*;
+
+    #[test]
+    fn local_transaction_keeps_payment_method_and_device() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        let tx = save_transaction(
+            &conn,
+            &TransactionInput {
+                id: None,
+                kind: "expense".into(),
+                amount_cents: 900,
+                date: "2026-11-14".into(),
+                account_id: "acc-bank".into(),
+                to_account_id: None,
+                category_id: Some("cat-goods".into()),
+                note: None,
+                recurring_id: None,
+                payment_method: Some("qr".into()),
+            },
+            "dev-test",
+        )
+        .unwrap();
+        let (method, device, deleted): (String, String, Option<String>) = conn
+            .query_row(
+                "SELECT payment_method, device_id, deleted_at FROM transactions WHERE id = ?1",
+                [&tx.id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(method, "qr");
+        assert_eq!(device, "dev-test");
+        assert!(deleted.is_none());
+    }
 }

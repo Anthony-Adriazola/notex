@@ -216,7 +216,7 @@ fn upsert_transaction(conn: &Connection, row: &Transaction) -> Result<(), String
         "INSERT INTO transactions
          (id, kind, amount_cents, date, account_id, to_account_id, category_id, note,
           recurring_id, created_at, updated_at, payment_method, deleted_at, device_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?14, ?12, ?13)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(id) DO UPDATE SET
              kind = excluded.kind,
              amount_cents = excluded.amount_cents,
@@ -526,4 +526,171 @@ fn get_budget_inner(
         },
     )
     .optional()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn test_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::migrate(&conn).unwrap();
+        conn
+    }
+
+    fn now() -> String {
+        "2026-11-14T10:00:00Z".to_string()
+    }
+
+    fn change(entity: &str, id: &str, payload: &str) -> SyncChange {
+        SyncChange {
+            seq: 1,
+            entity: entity.into(),
+            entity_id: id.into(),
+            op: "upsert".into(),
+            updated_at: now(),
+            device_id: "dev-remote".into(),
+            payload: payload.into(),
+        }
+    }
+
+    #[test]
+    fn sync_transaction_keeps_method_device_and_deleted_state() {
+        let conn = test_conn();
+        let transaction = Transaction {
+            id: "tx-sync-1".into(),
+            kind: "expense".into(),
+            amount_cents: 1250,
+            date: "2026-11-14".into(),
+            account_id: "acc-bank".into(),
+            to_account_id: None,
+            category_id: Some("cat-goods".into()),
+            note: "Prueba".into(),
+            recurring_id: None,
+            payment_method: Some("qr".into()),
+            created_at: now(),
+            updated_at: now(),
+            deleted_at: None,
+            device_id: "dev-remote".into(),
+        };
+        let payload = serde_json::to_string(&transaction).unwrap();
+        assert!(apply_change(&conn, &change("transaction", &transaction.id, &payload), false).unwrap());
+        let (method, device, deleted): (String, String, Option<String>) = conn
+            .query_row(
+                "SELECT payment_method, device_id, deleted_at FROM transactions WHERE id = 'tx-sync-1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(method, "qr");
+        assert_eq!(device, "dev-remote");
+        assert!(deleted.is_none());
+
+        let mut deleted_tx = transaction;
+        deleted_tx.id = "tx-sync-deleted".into();
+        deleted_tx.deleted_at = Some(now());
+        let payload = serde_json::to_string(&deleted_tx).unwrap();
+        assert!(apply_change(
+            &conn,
+            &change("transaction", &deleted_tx.id, &payload),
+            false
+        )
+        .unwrap());
+        let deleted: Option<String> = conn
+            .query_row(
+                "SELECT deleted_at FROM transactions WHERE id = 'tx-sync-deleted'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(deleted, Some(now()));
+    }
+
+    #[test]
+    fn sync_category_keeps_monthly_fields() {
+        let conn = test_conn();
+        let category = Category {
+            id: "cat-sync".into(),
+            name: "Concepto".into(),
+            kind: "expense".into(),
+            color: "#d9a441".into(),
+            icon: "gem".into(),
+            budget_cents: None,
+            monthly: true,
+            due_day: None,
+            reminder_days: 3,
+            usage_count: 0,
+            last_used: None,
+            last_amount_cents: None,
+            last_method: None,
+            archived: false,
+            created_at: now(),
+            updated_at: now(),
+            deleted_at: None,
+            device_id: "dev-remote".into(),
+        };
+        let payload = serde_json::to_string(&category).unwrap();
+        assert!(apply_change(&conn, &change("category", &category.id, &payload), false).unwrap());
+        let (monthly, due, reminder): (i64, Option<i64>, i64) = conn
+            .query_row(
+                "SELECT monthly, due_day, reminder_days FROM categories WHERE id = 'cat-sync'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(monthly, 1);
+        assert!(due.is_none());
+        assert_eq!(reminder, 3);
+    }
+
+    #[test]
+    fn sync_concept_skip_is_applied() {
+        let conn = test_conn();
+        let payload = r#"{"conceptId":"cat-goods","month":"2026-11"}"#;
+        assert!(apply_change(&conn, &change("concept_skip", "cat-goods:2026-11", payload), false).unwrap());
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM concept_skips WHERE concept_id = 'cat-goods' AND month = '2026-11'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn sync_planned_payment_keeps_amount_and_method() {
+        let conn = test_conn();
+        let planned = PlannedPayment {
+            id: "pp-sync".into(),
+            concept_id: "cat-goods".into(),
+            amount_cents: 2500,
+            due_date: "2026-11-20".into(),
+            note: "Proveedor".into(),
+            reminder_days: 1,
+            status: "pending".into(),
+            method: Some("cash".into()),
+            transaction_id: None,
+            created_at: now(),
+            updated_at: now(),
+            deleted_at: None,
+            device_id: "dev-remote".into(),
+            concept_name: None,
+            concept_color: None,
+            concept_icon: None,
+        };
+        let payload = serde_json::to_string(&planned).unwrap();
+        assert!(apply_change(&conn, &change("planned_payment", &planned.id, &payload), false).unwrap());
+        let (amount, method, status): (i64, String, String) = conn
+            .query_row(
+                "SELECT amount_cents, method, status FROM planned_payments WHERE id = 'pp-sync'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(amount, 2500);
+        assert_eq!(method, "cash");
+        assert_eq!(status, "pending");
+    }
 }

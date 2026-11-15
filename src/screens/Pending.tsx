@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Check, ChevronRight, Repeat, X } from "lucide-react";
+import { CalendarClock, Check, ChevronRight, Plus, Repeat, X } from "lucide-react";
 
 import { CategoryIcon } from "../lib/icons";
 import { api } from "../lib/api";
@@ -204,17 +204,22 @@ function PlannedRow({
           className="shrink-0 font-mono text-sm"
         />
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <Button
           variant="primary"
-          size="sm"
+          className="w-full sm:w-auto"
           onClick={onPay}
           disabled={busy || item.amountCents <= 0}
         >
           <Check className="h-4 w-4" strokeWidth={2.25} />
           Pagar
         </Button>
-        <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
+        <Button
+          variant="ghost"
+          className="w-full sm:w-auto"
+          onClick={onCancel}
+          disabled={busy}
+        >
           <X className="h-4 w-4" strokeWidth={2} />
           Cancelar
         </Button>
@@ -450,7 +455,7 @@ export function PendingScreen({
       ) : null}
 
       <Panel className="mb-4 overflow-hidden">
-        <div className="flex items-center justify-between gap-3 border-b border-line/70 px-4 py-3 sm:px-5">
+        <div className="flex flex-col gap-3 border-b border-line/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
             <Micro>Pendientes puntuales</Micro>
             <p className="mt-1 text-sm text-muted">
@@ -458,11 +463,12 @@ export function PendingScreen({
             </p>
           </div>
           <Button
-            size="sm"
             variant="outline"
+            className="w-full sm:w-auto"
             onClick={() => setShowPlannedForm((value) => !value)}
           >
-            + Agregar
+            <Plus className="h-4 w-4" strokeWidth={2.25} />
+            Agregar pendiente
           </Button>
         </div>
 
@@ -519,10 +525,10 @@ export function PendingScreen({
                 />
               </label>
             </div>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <Button
                 variant="primary"
-                size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => void createPlanned()}
                 disabled={creating || !newConceptId || !newDate}
               >
@@ -530,7 +536,7 @@ export function PendingScreen({
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => setShowPlannedForm(false)}
               >
                 Cancelar
